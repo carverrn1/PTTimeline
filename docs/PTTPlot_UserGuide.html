@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PTTPlot User Guide — PTTimeline v0.3.0</title>
+<title>PTTPlot User Guide — PTTimeline v0.3.1</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -287,7 +287,7 @@
 
   <!-- PAGE HEADER -->
   <header class="page-header">
-    <div class="app-label">PTTimeline v0.3.0</div>
+    <div class="app-label">PTTimeline v0.3.1</div>
     <h1>PTTPlot User Guide</h1>
     <div class="subtitle">Timeline Chart Plotter &mdash; Gantt-style horizontal bar charts from .pttd data files</div>
     <div class="data-flow">
@@ -551,7 +551,14 @@ python pttplot.py path/to/file.pttd</code></pre>
       presentation. This updates automatically when a different presentation is loaded.
     </p>
 
-    <h3>Stacking Submenu</h3>
+    <h3>Format Submenu</h3>
+    <p>
+      The <strong>Format</strong> submenu groups all visual formatting options. It contains three
+      sub-items: <strong>Bars</strong>, <strong>Process Attributes&hellip;</strong>, and
+      <strong>Dependency Arrows</strong>.
+    </p>
+
+    <h4>Format &rarr; Bars &rarr; Stacking</h4>
     <p>Controls how tasks are arranged vertically within each process row.</p>
 
     <div class="table-wrap">
@@ -580,10 +587,10 @@ python pttplot.py path/to/file.pttd</code></pre>
       </table>
     </div>
 
-    <h3>Labels Submenu</h3>
+    <h4>Format &rarr; Bars &rarr; Labels</h4>
     <p>Controls the position and orientation of task name labels drawn inside the bars.</p>
 
-    <h4>Horizontal Alignment</h4>
+    <p><strong>Horizontal Alignment</strong></p>
     <div class="table-wrap">
       <table>
         <thead>
@@ -602,7 +609,7 @@ python pttplot.py path/to/file.pttd</code></pre>
       </table>
     </div>
 
-    <h4>Label Rotation</h4>
+    <p><strong>Label Rotation</strong></p>
     <div class="table-wrap">
       <table>
         <thead>
@@ -626,6 +633,82 @@ python pttplot.py path/to/file.pttd</code></pre>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <h4>Format &rarr; Process Attributes&hellip;</h4>
+    <p>
+      Opens the <strong>Process Attributes</strong> dialog &mdash; a modeless (non-blocking) window
+      that lets you customize the bar color of each process independently.
+    </p>
+    <ul>
+      <li>The dialog displays a two-column table: process name on the left, a colored swatch button
+          on the right.</li>
+      <li>Click a swatch to open a standard color picker. Selecting a color immediately replots the
+          chart with the new color applied.</li>
+      <li><strong>Revert</strong> &mdash; Restores all process colors to the state they were in when
+          the dialog was opened.</li>
+      <li><strong>Close</strong> &mdash; Dismisses the dialog. Any color changes made survive in the
+          active configuration and will be written to the <code>.pttp</code> file the next time you
+          use <strong>Presentation &rarr; Save&hellip;</strong>.</li>
+    </ul>
+    <div class="note">
+      <strong>Note:</strong> The dialog remains open while you continue to work in the main window.
+      It refreshes automatically when the chart is reloaded. This item is disabled until a file is loaded.
+    </div>
+
+    <h4>Format &rarr; Dependency Arrows</h4>
+    <p>
+      Controls whether dependency arrows are shown persistently for all tasks, and selects how the
+      arrow endpoints are calculated. These settings complement the per-bar click gestures described
+      in <a href="#click-controls">Click Controls</a>.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Type</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Show Predecessors</strong></td>
+            <td>Checkable toggle</td>
+            <td>When checked, predecessor arrows are drawn for every task in the chart at all
+                times &mdash; equivalent to applying
+                <kbd>Shift</kbd>+<kbd>Ctrl</kbd>+<kbd>Left-Click</kbd> globally.</td>
+          </tr>
+          <tr>
+            <td><strong>Show Successors</strong></td>
+            <td>Checkable toggle</td>
+            <td>When checked, successor arrows are drawn for every task in the chart at all
+                times &mdash; equivalent to applying
+                <kbd>Shift</kbd>+<kbd>Ctrl</kbd>+<kbd>Right-Click</kbd> globally.</td>
+          </tr>
+          <tr>
+            <td><strong>Time</strong></td>
+            <td>Exclusive radio</td>
+            <td>
+              <strong>Time mode:</strong> Arrow endpoints are placed at the exact start or end
+              time values referenced in the formula. An arrow reflects the precise moment one
+              task's time value feeds into another.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Task</strong></td>
+            <td>Exclusive radio</td>
+            <td>
+              <strong>Task mode:</strong> Arrows connect the full extents of predecessor and
+              successor task bars (end of source bar to start of destination bar), regardless
+              of which time value is referenced in the formula.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>Tip:</strong> <em>Time</em> mode is most informative for formula-driven timelines
+      where you want to see exactly which time point one task depends on. <em>Task</em> mode
+      gives a cleaner overview when you simply want to visualize the sequencing between tasks.
     </div>
   </section>
 
@@ -1199,7 +1282,7 @@ python pttplot.py path/to/file.pttd</code></pre>
 
   <!-- FOOTER -->
   <footer>
-    <strong>PTTimeline v0.3.0</strong> &mdash; PTTPlot User Guide
+    <strong>PTTimeline v0.3.1</strong> &mdash; PTTPlot User Guide
   </footer>
 
 </div>

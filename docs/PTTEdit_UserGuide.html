@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PTTEdit User Guide &mdash; PTTimeline v0.3.0</title>
+<title>PTTEdit User Guide &mdash; PTTimeline v0.3.1</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -355,7 +355,7 @@
 
   <!-- PAGE HEADER -->
   <header class="page-header">
-    <div class="app-label">PTTimeline v0.3.0</div>
+    <div class="app-label">PTTimeline v0.3.1</div>
     <h1>PTTEdit User Guide</h1>
     <div class="subtitle">Timeline Data Editor &mdash; Spreadsheet-like editor for creating and editing .pttd timeline data files</div>
     <div class="data-flow">
@@ -428,7 +428,7 @@
 
     <div class="note">
       <strong>Note:</strong> PTTEdit must be run from the directory containing
-      <code>pttedit.py</code>, or from a location where the <code>ptt_lib/</code>
+      <code>pttedit.py</code>, or from a location where the <code>lib/</code>
       subdirectory is accessible relative to the script. Support modules are resolved
       from that subdirectory at startup.
     </div>
@@ -642,12 +642,44 @@
             <td><strong>Import CSV</strong></td>
             <td>&mdash;</td>
             <td>
-              Import timeline data from a CSV file. The CSV must contain these columns
-              in order: <code>ProcessName</code>, <code>TaskName</code>,
-              <code>StartTimeFormula</code>, <code>StartTime</code>,
-              <code>EndTimeFormula</code>, <code>EndTime</code>, <code>Duration</code>.
+              Replace the current timeline with data from a CSV file. The CSV must
+              contain these columns in order: <code>ProcessName</code>,
+              <code>TaskName</code>, <code>StartTimeFormula</code>,
+              <code>StartTime</code>, <code>EndTimeFormula</code>,
+              <code>EndTime</code>, <code>Duration</code>.
               Formula strings are preserved; computed columns are recalculated after
-              import.
+              import. Prompts to save unsaved changes before replacing.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Append CSV</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Append rows from a CSV file to the <em>end</em> of the current timeline
+              without discarding existing data. The CSV must use the same column layout
+              as Import CSV. Duplicate <em>ProcessName:TaskName</em> pairs are
+              automatically renamed using the <code>_COPY_##</code> suffix to avoid
+              conflicts. Prompts to save unsaved changes before appending.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Export CSV</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Export the current timeline to a CSV file. The output path is derived
+              automatically from the current <code>.pttd</code> filename (same
+              directory and base name, with a <code>.csv</code> extension). If a file
+              with that name already exists, a confirmation dialog is shown before
+              overwriting. This item is disabled until a file has been loaded or saved.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Export ODS</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Export the current timeline to an OpenDocument Spreadsheet
+              (<code>.ods</code>) file. The output path follows the same convention as
+              Export CSV. This item is disabled until a file has been loaded or saved.
             </td>
           </tr>
           <tr>
@@ -1096,11 +1128,12 @@ StartTimeFormula: Max(EndTime(Branch1:Build), EndTime(Branch2:Build))</code></pr
             <td><strong>Paste Row</strong></td>
             <td>
               Insert the copied row below the currently selected row. If the resulting
-              ProcessName:TaskName would duplicate an existing row, the TaskName is
-              automatically renamed to avoid the conflict. For example, if
-              <code>Task1</code> already exists, the pasted row becomes
-              <code>Task1_COPY_1</code>; if that also exists, <code>Task1_COPY_2</code>,
-              and so on.
+              ProcessName:TaskName combination would duplicate an existing row, the
+              TaskName is automatically renamed with an incrementing suffix to avoid
+              the conflict. For example, if <code>Task1</code> already exists in the
+              same process, the pasted TaskName becomes <code>Task1_COPY_1</code>; if
+              that also exists, <code>Task1_COPY_2</code>, and so on. The ProcessName
+              is copied as-is and may be blank (blank ProcessName rows are valid).
             </td>
           </tr>
           <tr>
@@ -1276,8 +1309,10 @@ StartTimeFormula: Max(EndTime(Branch1:Build), EndTime(Branch2:Build))</code></pr
     </ol>
 
     <p>
-      If PTTPlot is already running with the same file, a message is displayed rather
-      than launching a second instance.
+      Only one PTTPlot instance can be open at a time from PTTEdit. If a PTTPlot window
+      is already open, a message is displayed (“Close plotter to open a new plot”) and a
+      new instance is not launched. Close the existing PTTPlot window first to plot a
+      different file.
     </p>
 
     <div class="note">
@@ -1369,7 +1404,7 @@ StartTimeFormula: Max(EndTime(Branch1:Build), EndTime(Branch2:Build))</code></pr
 
   <!-- FOOTER -->
   <footer>
-    <strong>PTTimeline v0.3.0</strong> &mdash; PTTEdit User Guide
+    <strong>PTTimeline v0.3.1</strong> &mdash; PTTEdit User Guide
   </footer>
 
 </div>

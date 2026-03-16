@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PTTView User Guide &mdash; PTTimeline v0.3.0</title>
+<title>PTTView User Guide &mdash; PTTimeline v0.3.1</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -318,7 +318,7 @@
 
   <!-- PAGE HEADER -->
   <header class="page-header">
-    <div class="app-label">PTTimeline v0.3.0</div>
+    <div class="app-label">PTTimeline v0.3.1</div>
     <h1>PTTView User Guide</h1>
     <div class="subtitle">Timeline Image Viewer &mdash; Smooth zoom, pan, and thumbnail navigation for exported timeline plots</div>
     <div class="data-flow">
@@ -447,7 +447,53 @@
     </ul>
 
     <h3>Toolbar</h3>
-    <p>A toolbar below the menu bar provides quick access to the most common zoom operations as clickable buttons: <strong>Zoom In (+)</strong> and <strong>Zoom Out (-)</strong>. These are equivalent to the <kbd>Ctrl</kbd>+<kbd>+</kbd> and <kbd>Ctrl</kbd>+<kbd>-</kbd> keyboard shortcuts. The toolbar is always visible and cannot be hidden.</p>
+    <p>A toolbar below the menu bar provides quick access to the most common zoom and view operations
+    as clickable buttons. The toolbar is always visible and cannot be hidden.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Button</th><th>Equivalent Shortcut</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Zoom In (+)</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>+</kbd></td>
+            <td>Increase zoom by 15%.</td>
+          </tr>
+          <tr>
+            <td><strong>Zoom Out (-)</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>-</kbd></td>
+            <td>Decrease zoom by 15%.</td>
+          </tr>
+          <tr>
+            <td><strong>Fit to Window</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>0</kbd></td>
+            <td>Scale the image to fit the current window size.</td>
+          </tr>
+          <tr>
+            <td><strong>Actual Size</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>1</kbd></td>
+            <td>Reset zoom to 100% (1:1 pixel mapping for raster images).</td>
+          </tr>
+          <tr>
+            <td><strong>Scale&hellip;</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td>
+            <td>Open the custom zoom dialog to type a specific zoom percentage.</td>
+          </tr>
+          <tr>
+            <td><strong>Center</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td>
+            <td>Centre the image within the visible canvas at the current zoom level.</td>
+          </tr>
+          <tr>
+            <td><strong>Map</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>M</kbd></td>
+            <td>Open the Map Navigator thumbnail dialog.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <!-- 3. LAUNCHING PTTVIEW -->
@@ -828,7 +874,7 @@ python pttview.py</code></pre>
 
   <!-- FOOTER -->
   <footer>
-    <strong>PTTimeline v0.3.0</strong> &mdash; PTTView User Guide
+    <strong>PTTimeline v0.3.1</strong> &mdash; PTTView User Guide
   </footer>
 
 </div>
