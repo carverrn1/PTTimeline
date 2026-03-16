@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PTTEdit User Guide &mdash; PTTimeline v0.3.0</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: #1a202c;
+    background: #f7fafc;
+    padding: 2rem 1rem;
+  }
+
+  .page-wrapper {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* ── Page Header ── */
+  .page-header {
+    background: #2c5282;
+    color: #fff;
+    border-radius: 10px;
+    padding: 2.5rem 2.5rem 2rem;
+    margin-bottom: 2rem;
+  }
+  .page-header .app-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #90cdf4;
+    margin-bottom: 0.4rem;
+  }
+  .page-header h1 {
+    font-size: 2.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    line-height: 1.2;
+  }
+  .page-header .subtitle {
+    font-size: 1rem;
+    color: #bee3f8;
+    font-weight: 400;
+  }
+  .data-flow {
+    margin-top: 1.4rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+  }
+  .data-flow .step {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 5px;
+    padding: 0.2rem 0.7rem;
+    font-weight: 500;
+    color: #fff;
+  }
+  .data-flow .step.current {
+    background: #3182ce;
+    border-color: #63b3ed;
+  }
+  .data-flow .arrow {
+    color: #90cdf4;
+    font-size: 1rem;
+  }
+
+  /* ── TOC ── */
+  .toc-card {
+    background: #fff;
+    border: 1px solid #bee3f8;
+    border-left: 4px solid #3182ce;
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 4px rgba(44,82,130,0.07);
+  }
+  .toc-card h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2c5282;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 1rem;
+  }
+  .toc-card ol {
+    list-style: none;
+    counter-reset: toc;
+    columns: 2;
+    column-gap: 2rem;
+  }
+  @media (max-width: 600px) { .toc-card ol { columns: 1; } }
+  .toc-card ol li {
+    counter-increment: toc;
+    padding: 0.18rem 0;
+  }
+  .toc-card ol li::before {
+    content: counter(toc) ".";
+    color: #3182ce;
+    font-weight: 700;
+    margin-right: 0.45rem;
+    min-width: 1.4rem;
+    display: inline-block;
+  }
+  .toc-card a {
+    color: #2c5282;
+    text-decoration: none;
+    font-size: 0.92rem;
+  }
+  .toc-card a:hover { color: #3182ce; text-decoration: underline; }
+
+  /* ── Section Cards ── */
+  .section {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 1.75rem;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+    scroll-margin-top: 1rem;
+  }
+  .section h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #2c5282;
+    border-bottom: 2px solid #bee3f8;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .section h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #2c5282;
+    margin: 1.4rem 0 0.6rem;
+  }
+  .section h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin: 1rem 0 0.4rem;
+  }
+  .section p { margin-bottom: 0.85rem; }
+  .section ul, .section ol {
+    margin: 0.5rem 0 0.85rem 1.5rem;
+  }
+  .section li { margin-bottom: 0.3rem; }
+
+  .section-num {
+    display: inline-block;
+    background: #2c5282;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 4px;
+    padding: 0.05rem 0.45rem;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+  }
+
+  /* ── kbd ── */
+  kbd {
+    display: inline-block;
+    background: #e2e8f0;
+    border: 1px solid #cbd5e0;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0.1rem 0.5rem;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.82rem;
+    color: #2d3748;
+    white-space: nowrap;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.12);
+  }
+
+  /* ── code / pre ── */
+  code {
+    background: #f0f4f8;
+    color: #2c5282;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.875rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #1a202c;
+    color: #e2e8f0;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.855rem;
+    line-height: 1.6;
+    border-radius: 7px;
+    padding: 1.1rem 1.4rem;
+    overflow-x: auto;
+    margin: 0.75rem 0 1rem;
+  }
+  pre code {
+    background: none;
+    color: inherit;
+    font-size: inherit;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+  }
+  .sc { color: #718096; }  /* syntax: comment */
+  .sk { color: #90cdf4; }  /* syntax: key */
+  .sv { color: #fbd38d; }  /* syntax: value */
+  .ss { color: #9ae6b4; }  /* syntax: string highlight */
+  .comment { color: #68d391; }  /* formula comment */
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin: 0.75rem 0 1rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  thead tr {
+    background: #2c5282;
+    color: #fff;
+  }
+  thead th {
+    padding: 0.65rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+  }
+  tbody tr:nth-child(even) { background: #f7fafc; }
+  tbody tr:hover { background: #ebf8ff; }
+  tbody td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+
+  /* ── Callout boxes ── */
+  .note {
+    background: #ebf8ff;
+    border-left: 4px solid #3182ce;
+    border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1.1rem;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.9rem;
+    color: #2c5282;
+  }
+  .note strong { color: #2c5282; }
+  .warning {
+    background: #fffaf0;
+    border-left: 4px solid #dd6b20;
+    border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1.1rem;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.9rem;
+    color: #7b341e;
+  }
+  .warning strong { color: #c05621; }
+  .tip {
+    background: #f0fff4;
+    border-left: 4px solid #38a169;
+    border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1.1rem;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.9rem;
+    color: #276749;
+  }
+  .tip strong { color: #276749; }
+
+  /* ── Tier accent colours ── */
+  .tier-1 { color: #553c9a; font-weight: 600; }
+  .tier-2 { color: #276749; font-weight: 600; }
+  .tier-3 { color: #c05621; font-weight: 600; }
+  .tier-4 { color: #b7791f; font-weight: 600; }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    color: #718096;
+    font-size: 0.82rem;
+    padding: 2rem 0 1rem;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 1rem;
+  }
+  footer strong { color: #4a5568; }
+
+  /* ── PTTEdit-specific: Column label pills ── */
+  .col-label {
+    display: inline-block;
+    background: #2c5282;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+  .col-label.readonly { background: #718096; }
+
+  /* ── PTTEdit-specific: Error code badges ── */
+  .err {
+    display: inline-block;
+    background: #fff5f5;
+    color: #c53030;
+    border: 1px solid #fed7d7;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── PTTEdit-specific: Cell appearance demos ── */
+  .cell-demo {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    border: 1px solid #e2e8f0;
+  }
+  .cell-demo.c-calc   { background: #e2e8f0; color: #4a5568; font-style: italic; border-color: #cbd5e0; }
+  .cell-demo.c-err    { background: #e2e8f0; color: #c53030; font-weight: 700; border-color: #fed7d7; }
+  .cell-demo.c-neg    { background: #fffff0; color: #742a2a; font-weight: 700; border-color: #feebc8; }
+
+  /* ── PTTEdit-specific: Menu path ── */
+  .menu-path {
+    font-size: 0.9rem;
+    color: #4a5568;
+    margin-bottom: 10px;
+  }
+  .menu-item {
+    display: inline-block;
+    background: #edf2f7;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+    padding: 1px 8px;
+    font-size: 0.85rem;
+    color: #2d3748;
+  }
+  .sep { margin: 0 4px; color: #a0aec0; }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- PAGE HEADER -->
+  <header class="page-header">
+    <div class="app-label">PTTimeline v0.3.0</div>
+    <h1>PTTEdit User Guide</h1>
+    <div class="subtitle">Timeline Data Editor &mdash; Spreadsheet-like editor for creating and editing .pttd timeline data files</div>
+    <div class="data-flow">
+      <span class="step current">PTTEdit</span>
+      <span class="arrow">&#8594;</span>
+      <span class="step">PTTPlot</span>
+      <span class="arrow">&#8594;</span>
+      <span class="step">PTTView</span>
+    </div>
+  </header>
+
+  <!-- TABLE OF CONTENTS -->
+  <nav class="toc-card" aria-label="Table of Contents">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#command-line">Command-Line Usage</a></li>
+      <li><a href="#grid">The Grid (Spreadsheet)</a></li>
+      <li><a href="#file-ops">File Operations</a></li>
+      <li><a href="#formulas">The Formula System</a></li>
+      <li><a href="#row-ops">Row Operations</a></li>
+      <li><a href="#context-menus">Context Menus</a></li>
+      <li><a href="#keyboard">Keyboard Shortcuts</a></li>
+      <li><a href="#launching">Launching PTTPlot</a></li>
+      <li><a href="#status-bar">Status Bar</a></li>
+      <li><a href="#help-menu">Help Menu</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1. OVERVIEW -->
+  <section class="section" id="overview">
+    <h2><span class="section-num">1</span>Overview</h2>
+
+    <p>
+      PTTEdit is the spreadsheet-like data editor for creating and editing
+      <code>.pttd</code> timeline data files. It provides a formula system for defining
+      task start and end times, including dependency relationships between tasks.
+      The resulting data file is consumed by PTTPlot to render a Gantt-style horizontal
+      bar chart, which can then be viewed or exported through PTTView.
+    </p>
+
+    <p>The PTTimeline pipeline works as follows:</p>
+
+    <ol>
+      <li><strong>PTTEdit</strong> &mdash; Create or edit a <code>.pttd</code> data file containing process and task definitions with time formulas.</li>
+      <li><strong>PTTPlot</strong> &mdash; Open the <code>.pttd</code> file to render and export the Gantt-style chart.</li>
+      <li><strong>PTTView</strong> &mdash; View the exported image file (SVG, PNG, JPG, or PDF).</li>
+    </ol>
+
+    <p>
+      PTTEdit is built with Python 3.10, PySide6 (Qt GUI framework), and pandas/numpy for
+      data handling. Data files are stored in JSON5 format (JSON extended with comment
+      support) using the <code>.pttd</code> extension.
+    </p>
+  </section>
+
+  <!-- 2. COMMAND-LINE USAGE -->
+  <section class="section" id="command-line">
+    <h2><span class="section-num">2</span>Command-Line Usage</h2>
+
+    <p>Launch PTTEdit from a terminal with an optional filename argument:</p>
+
+    <pre><code>python pttedit.py [filename.pttd]</code></pre>
+
+    <ul>
+      <li>If a filename is provided, that file is opened immediately on startup.</li>
+      <li>The <code>.pttd</code> extension is appended automatically if the argument has no extension.</li>
+      <li>If no filename is given, PTTEdit starts with a blank interface containing one empty row.</li>
+    </ul>
+
+    <div class="note">
+      <strong>Note:</strong> PTTEdit must be run from the directory containing
+      <code>pttedit.py</code>, or from a location where the <code>ptt_lib/</code>
+      subdirectory is accessible relative to the script. Support modules are resolved
+      from that subdirectory at startup.
+    </div>
+  </section>
+
+  <!-- 3. THE GRID -->
+  <section class="section" id="grid">
+    <h2><span class="section-num">3</span>The Grid (Spreadsheet)</h2>
+
+    <p>
+      The central element of PTTEdit is a spreadsheet-style grid. Each row represents
+      one task in the timeline. There are seven columns: four that are directly editable
+      and three that are read-only (automatically computed from the formulas).
+    </p>
+
+    <h3 id="grid-columns">Columns</h3>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Header</th>
+            <th>Editable</th>
+            <th>Internal Name</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>0</td>
+            <td><span class="col-label">Process</span></td>
+            <td>Yes</td>
+            <td><code>ProcessName</code></td>
+            <td>
+              Identifier for a process (a named row group). Must begin with a letter or
+              underscore, followed by letters, digits, or underscores only.
+            </td>
+          </tr>
+          <tr>
+            <td>1</td>
+            <td><span class="col-label">Task</span></td>
+            <td>Yes</td>
+            <td><code>TaskName</code></td>
+            <td>
+              Identifier for a task within a process. Same character rules as
+              ProcessName. The combination <em>ProcessName:TaskName</em> must be unique
+              across all rows in the file.
+            </td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><span class="col-label">Start-&fnof;</span></td>
+            <td>Yes</td>
+            <td><code>StartTimeFormula</code></td>
+            <td>
+              Formula expression that defines the task start time. Plain numbers are
+              valid (e.g., <code>0</code>, <code>1.5</code>). May reference other tasks.
+            </td>
+          </tr>
+          <tr>
+            <td>3</td>
+            <td><span class="col-label readonly">Start</span></td>
+            <td>No (calculated)</td>
+            <td><code>StartTime</code></td>
+            <td>
+              Evaluated numeric result of StartTimeFormula. Displayed in italic grey.
+              Automatically recomputed whenever any formula in the grid changes.
+            </td>
+          </tr>
+          <tr>
+            <td>4</td>
+            <td><span class="col-label">End-&fnof;</span></td>
+            <td>Yes</td>
+            <td><code>EndTimeFormula</code></td>
+            <td>
+              Formula expression that defines the task end time. Same syntax rules
+              as StartTimeFormula.
+            </td>
+          </tr>
+          <tr>
+            <td>5</td>
+            <td><span class="col-label readonly">End</span></td>
+            <td>No (calculated)</td>
+            <td><code>EndTime</code></td>
+            <td>
+              Evaluated numeric result of EndTimeFormula. Displayed in italic grey.
+            </td>
+          </tr>
+          <tr>
+            <td>6</td>
+            <td><span class="col-label readonly">Duration</span></td>
+            <td>No (calculated)</td>
+            <td><code>Duration</code></td>
+            <td>
+              Computed as <em>EndTime &minus; StartTime</em>. Displayed in italic grey.
+              A negative value indicates the end time is earlier than the start time.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Read-only columns (Start, End, Duration) use a grey background and italic text to
+      visually distinguish them from editable columns. Clicking on these cells does not
+      open an editor; their values are derived entirely from the formula columns.
+    </p>
+
+    <h3 id="grid-highlighting">Cell Highlighting</h3>
+
+    <p>
+      PTTEdit uses background and text color to communicate calculation status at a
+      glance without requiring the user to inspect individual cells:
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Condition</th>
+            <th>Appearance</th>
+            <th>Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Normal calculated value</td>
+            <td>Grey background, italic dark grey text</td>
+            <td><span class="cell-demo c-calc">3.5</span></td>
+          </tr>
+          <tr>
+            <td>Formula evaluation error</td>
+            <td>Grey background, red bold text (error code shown)</td>
+            <td><span class="cell-demo c-err">EXPR_ERR</span></td>
+          </tr>
+          <tr>
+            <td>Negative duration</td>
+            <td>Light yellow background, dark red bold text</td>
+            <td><span class="cell-demo c-neg">&minus;2.0</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="warning">
+      <strong>Warning:</strong> A negative duration means a task's end time is earlier
+      than its start time. PTTPlot may render such tasks incorrectly or omit them.
+      Resolve negative durations before generating a chart.
+    </div>
+  </section>
+
+  <!-- 4. FILE OPERATIONS -->
+  <section class="section" id="file-ops">
+    <h2><span class="section-num">4</span>File Operations</h2>
+
+    <p>All file operations are accessible from the <strong>File</strong> menu.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>Shortcut</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Demo</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Load a pre-populated example timeline. Useful for exploring features and
+              formula syntax without creating data from scratch. Prompts to save
+              unsaved changes first.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>New</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Clear the grid and create an empty timeline containing one blank row.
+              Prompts to save unsaved changes before clearing.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Open</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>O</kbd></td>
+            <td>
+              Open a <code>.pttd</code> file via a file picker dialog. The file is
+              parsed as JSON5. Prompts to save unsaved changes before opening.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Save</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>S</kbd></td>
+            <td>
+              Save the current file to its existing path. If the file has no filename
+              yet (never been saved), behaves as Save As.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Save As&hellip;</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Save the current data to a new filename chosen via a file picker dialog.
+              The <code>.pttd</code> extension is appended automatically if omitted.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Import CSV</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Import timeline data from a CSV file. The CSV must contain these columns
+              in order: <code>ProcessName</code>, <code>TaskName</code>,
+              <code>StartTimeFormula</code>, <code>StartTime</code>,
+              <code>EndTimeFormula</code>, <code>EndTime</code>, <code>Duration</code>.
+              Formula strings are preserved; computed columns are recalculated after
+              import.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Exit</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Close the application. If there are unsaved changes, a Save / Discard /
+              Cancel dialog is shown before exiting.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 id="file-format">File Format (.pttd)</h3>
+
+    <p>
+      PTTEdit data files use <strong>JSON5</strong> format (JSON extended with comment
+      and trailing-comma support) and carry the <code>.pttd</code> extension. A
+      <code>.pttd</code> file stores:
+    </p>
+
+    <ul>
+      <li>
+        A <strong>config section</strong> with file-level metadata and any saved
+        configuration settings.
+      </li>
+      <li>
+        <strong>Row data</strong> for every task, including the raw formula strings
+        (<code>StartTimeFormula</code>, <code>EndTimeFormula</code>) and the last
+        evaluated numeric results (<code>StartTime</code>, <code>EndTime</code>,
+        <code>Duration</code>).
+      </li>
+    </ul>
+
+    <p>
+      Because JSON5 is used, you may add <code>//</code> line comments or
+      <code>/* */</code> block comments when editing <code>.pttd</code> files
+      manually in a text editor. Be aware that PTTEdit's own Save function does not
+      preserve comments; manual comments will be removed when the file is saved
+      by PTTEdit.
+    </p>
+
+    <div class="note">
+      <strong>Note:</strong> <code>.pttd</code> files are plain text and are suitable
+      for version control with any standard VCS (git, SVN, etc.).
+    </div>
+
+    <h3 id="unsaved">Unsaved Changes</h3>
+
+    <p>
+      When the current timeline contains unsaved changes, PTTEdit appends an asterisk
+      to the window title: <code>PTTEdit &mdash; myproject.pttd *</code>.
+    </p>
+
+    <p>
+      Attempting to open a new file, create a new timeline, or exit while unsaved
+      changes exist triggers a prompt with three options:
+    </p>
+
+    <ul>
+      <li><strong>Save</strong> &mdash; Save the current file and then continue the requested operation.</li>
+      <li><strong>Discard</strong> &mdash; Abandon unsaved changes and continue without saving.</li>
+      <li><strong>Cancel</strong> &mdash; Return to the editor without performing any operation.</li>
+    </ul>
+  </section>
+
+  <!-- 5. THE FORMULA SYSTEM -->
+  <section class="section" id="formulas">
+    <h2><span class="section-num">5</span>The Formula System</h2>
+
+    <p>
+      Formulas are entered in the <span class="col-label">Start-&fnof;</span> and
+      <span class="col-label">End-&fnof;</span> columns. A formula is any expression
+      that evaluates to a numeric value. A plain number is a valid formula
+      (e.g., <code>0</code>, <code>1.5</code>). Formulas may reference the computed
+      start time, end time, or duration of any other task in the file.
+    </p>
+
+    <h3 id="arithmetic">Arithmetic Operators</h3>
+
+    <p>
+      Standard arithmetic operators are supported with conventional operator precedence:
+      <code>*</code> and <code>/</code> are evaluated before <code>+</code> and
+      <code>-</code>. Parentheses can override precedence.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Operator</th><th>Operation</th><th>Example</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>+</code></td>
+            <td>Addition</td>
+            <td><code>EndTime($:Design) + 1</code></td>
+          </tr>
+          <tr>
+            <td><code>-</code></td>
+            <td>Subtraction</td>
+            <td><code>EndTime($:Build) - 0.5</code></td>
+          </tr>
+          <tr>
+            <td><code>*</code></td>
+            <td>Multiplication</td>
+            <td><code>Duration($:Phase1) * 2</code></td>
+          </tr>
+          <tr>
+            <td><code>/</code></td>
+            <td>Division</td>
+            <td><code>Duration($:Phase1) / 3</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 id="ref-functions">Reference Functions</h3>
+
+    <p>
+      Reference functions look up a computed value from another task. The target task is
+      identified by a <em>ProcessName:TaskName</em> pair separated by a colon.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th>Aliases</th>
+            <th>Returns</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>StartTime(P:T)</code></td>
+            <td><code>Start(P:T)</code></td>
+            <td>The evaluated start time of task <em>T</em> in process <em>P</em></td>
+          </tr>
+          <tr>
+            <td><code>EndTime(P:T)</code></td>
+            <td><code>End(P:T)</code></td>
+            <td>The evaluated end time of task <em>T</em> in process <em>P</em></td>
+          </tr>
+          <tr>
+            <td><code>Duration(P:T)</code></td>
+            <td><code>Total(P:T)</code>, <code>Value(P:T)</code></td>
+            <td>The evaluated duration of task <em>T</em> in process <em>P</em></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      All function names are <strong>case-insensitive</strong>. <code>starttime</code>,
+      <code>StartTime</code>, and <code>STARTTIME</code> are all valid and equivalent.
+    </p>
+
+    <h3 id="multi-arg">Multi-Argument Functions</h3>
+
+    <p>
+      Multi-argument functions accept two or more comma-separated arguments. Each
+      argument may itself be an arithmetic expression, a reference function call, or
+      another multi-argument function call.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th>Arguments</th>
+            <th>Returns</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Min(a, b, &hellip;)</code></td>
+            <td>Two or more values</td>
+            <td>The minimum of all arguments</td>
+          </tr>
+          <tr>
+            <td><code>Max(a, b, &hellip;)</code></td>
+            <td>Two or more values</td>
+            <td>The maximum of all arguments</td>
+          </tr>
+          <tr>
+            <td><code>If(cond, a, b)</code></td>
+            <td>Condition, true-value, false-value</td>
+            <td><code>a</code> if <em>cond</em> &ne; 0, otherwise <code>b</code></td>
+          </tr>
+          <tr>
+            <td><code>Not(a)</code></td>
+            <td>One value</td>
+            <td>1.0 if <em>a</em> = 0, otherwise 0.0</td>
+          </tr>
+          <tr>
+            <td><code>Or(a, b, &hellip;)</code></td>
+            <td>Two or more values</td>
+            <td>1.0 if any argument &ne; 0, otherwise 0.0</td>
+          </tr>
+          <tr>
+            <td><code>And(a, b, &hellip;)</code></td>
+            <td>Two or more values</td>
+            <td>1.0 if all arguments &ne; 0, otherwise 0.0</td>
+          </tr>
+          <tr>
+            <td><code>IsLessThan(a, b)</code></td>
+            <td>Two values</td>
+            <td>1.0 if <em>a</em> &lt; <em>b</em>, otherwise 0.0</td>
+          </tr>
+          <tr>
+            <td><code>IsGreaterThan(a, b)</code></td>
+            <td>Two values</td>
+            <td>1.0 if <em>a</em> &gt; <em>b</em>, otherwise 0.0</td>
+          </tr>
+          <tr>
+            <td><code>IsLessEqual(a, b)</code></td>
+            <td>Two values</td>
+            <td>1.0 if <em>a</em> &le; <em>b</em>, otherwise 0.0</td>
+          </tr>
+          <tr>
+            <td><code>IsGreaterEqual(a, b)</code></td>
+            <td>Two values</td>
+            <td>1.0 if <em>a</em> &ge; <em>b</em>, otherwise 0.0</td>
+          </tr>
+          <tr>
+            <td><code>IsEqual(a, b)</code></td>
+            <td>Two values</td>
+            <td>1.0 if <em>a</em> = <em>b</em>, otherwise 0.0</td>
+          </tr>
+          <tr>
+            <td><code>IsNotEqual(a, b)</code></td>
+            <td>Two values</td>
+            <td>1.0 if <em>a</em> &ne; <em>b</em>, otherwise 0.0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tip">
+      <strong>Tip:</strong> Comparison functions return 1.0 (true) or 0.0 (false),
+      making them directly composable with <code>If()</code>, <code>And()</code>,
+      <code>Or()</code>, and <code>Not()</code> for building conditional logic.
+    </div>
+
+    <h3 id="macro">$ Macro Expansion</h3>
+
+    <p>
+      The <code>$</code> symbol is a positional macro that expands to the
+      <strong>ProcessName or TaskName of the row containing the formula</strong>,
+      depending on where it appears within a reference function argument.
+    </p>
+
+    <p>
+      Inside a <code>FunctionName(P:T)</code> argument, <code>$</code> in the
+      <em>P</em> position expands to the current row's ProcessName; <code>$</code>
+      in the <em>T</em> position expands to the current row's TaskName.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Formula Written</th>
+            <th>Row (Process : Task)</th>
+            <th>Expands To</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>StartTime($:Task1)</code></td>
+            <td>Process1 : Task2</td>
+            <td><code>StartTime(Process1:Task1)</code></td>
+          </tr>
+          <tr>
+            <td><code>EndTime(Process1:$)</code></td>
+            <td>Process1 : Task2</td>
+            <td><code>EndTime(Process1:Task2)</code></td>
+          </tr>
+          <tr>
+            <td><code>Duration($:$)</code></td>
+            <td>Process1 : Task2</td>
+            <td><code>Duration(Process1:Task2)</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      The <code>$</code> macro is especially useful when copying rows or designing
+      formulas that should always reference <em>the current process</em> without
+      hard-coding its name, making rows more portable when process names change.
+    </p>
+
+    <h3 id="examples">Formula Examples</h3>
+
+<pre><code><span class="comment"># Task starts at time 0</span>
+StartTimeFormula: 0
+
+<span class="comment"># Task ends 2.5 units after the Design task in the same process starts</span>
+EndTimeFormula:   StartTime($:Design) + 2.5
+
+<span class="comment"># Task starts immediately when its predecessor ends</span>
+StartTimeFormula: EndTime($:Design)
+
+<span class="comment"># Task starts at the latest end time of two predecessor tasks</span>
+StartTimeFormula: Max(EndTime(TeamA:Design), EndTime(TeamB:Prototype))
+
+<span class="comment"># Task ends at the midpoint between two tasks</span>
+EndTimeFormula:   (EndTime($:PhaseA) + StartTime($:PhaseB)) / 2
+
+<span class="comment"># Start at 5 if Design duration exceeds 3 units, otherwise start at 3</span>
+StartTimeFormula: If(IsGreaterThan(Duration($:Design), 3), 5, 3)
+
+<span class="comment"># Start only after both parallel branches complete</span>
+StartTimeFormula: Max(EndTime(Branch1:Build), EndTime(Branch2:Build))</code></pre>
+
+    <h3 id="circular">Circular Reference Detection</h3>
+
+    <p>
+      PTTEdit detects circular dependencies in the formula graph before evaluation. A
+      circular dependency exists when task A references task B, and task B references
+      task A, whether directly or through a chain of intermediate tasks.
+    </p>
+
+    <p>
+      The expression evaluator uses <strong>topological sorting (Kahn's algorithm)</strong>
+      to determine the correct evaluation order. Tasks with no dependencies are evaluated
+      first; tasks depending on others are evaluated after their dependencies resolve.
+      If the dependency graph contains a cycle, all tasks involved are flagged with
+      <span class="err">CIRC_ERR</span> and cannot produce a value until the cycle
+      is broken.
+    </p>
+
+    <div class="warning">
+      <strong>Warning:</strong> Circular references must be resolved before PTTPlot
+      can be launched. Break the cycle by removing or redirecting at least one formula
+      that participates in the cycle.
+    </div>
+
+    <h3 id="error-codes">Error Codes</h3>
+
+    <p>
+      When a cell cannot be evaluated, an error code is displayed in the calculated
+      column. Error cells are shown with red bold text. The status bar also displays
+      the total count of cells containing errors.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Error Code</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="err">EXPR_ERR</span></td>
+            <td>
+              The formula string contains invalid expression syntax. Check for
+              unmatched parentheses, unknown function names, or typographical errors.
+            </td>
+          </tr>
+          <tr>
+            <td><span class="err">STRT_ERR</span></td>
+            <td>
+              The formula parsed successfully but an error occurred while evaluating
+              the start time (for example, a referenced task does not exist).
+            </td>
+          </tr>
+          <tr>
+            <td><span class="err">END_ERR</span></td>
+            <td>
+              The formula parsed successfully but an error occurred while evaluating
+              the end time.
+            </td>
+          </tr>
+          <tr>
+            <td><span class="err">DRTN_ERR</span></td>
+            <td>
+              An error occurred while computing Duration from the evaluated start and
+              end times.
+            </td>
+          </tr>
+          <tr>
+            <td><span class="err">CIRC_ERR</span></td>
+            <td>
+              A circular dependency was detected. This task is part of a reference
+              cycle and cannot be evaluated until the cycle is broken.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>Note:</strong> Launching PTTPlot is blocked while any cell in the grid
+      displays an error code (any value ending in <code>ERR</code>). Resolve all errors
+      first.
+    </div>
+  </section>
+
+  <!-- 6. ROW OPERATIONS -->
+  <section class="section" id="row-ops">
+    <h2><span class="section-num">6</span>Row Operations</h2>
+
+    <p>
+      Row operations are available via the <strong>Edit</strong> menu or by
+      right-clicking on a <strong>row number</strong> in the vertical header on the
+      left side of the grid. A row must be selected before these operations apply.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Operation</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Move Row Up</strong></td>
+            <td>
+              Move the selected row one position upward in the grid. This affects the
+              display and export order only; formula references use ProcessName:TaskName
+              identifiers and are not affected by row position.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Move Row Down</strong></td>
+            <td>Move the selected row one position downward in the grid.</td>
+          </tr>
+          <tr>
+            <td><strong>Add Row Above</strong></td>
+            <td>Insert a new blank row immediately above the selected row.</td>
+          </tr>
+          <tr>
+            <td><strong>Add Row Below</strong></td>
+            <td>Insert a new blank row immediately below the selected row.</td>
+          </tr>
+          <tr>
+            <td><strong>Copy Row</strong></td>
+            <td>
+              Copy the selected row to an internal clipboard, storing ProcessName,
+              TaskName, and both formula strings.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Paste Row</strong></td>
+            <td>
+              Insert the copied row below the currently selected row. If the resulting
+              ProcessName:TaskName would duplicate an existing row, the TaskName is
+              automatically renamed to avoid the conflict. For example, if
+              <code>Task1</code> already exists, the pasted row becomes
+              <code>Task1_COPY_1</code>; if that also exists, <code>Task1_COPY_2</code>,
+              and so on.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Delete Row</strong></td>
+            <td>
+              Delete the selected row after displaying a confirmation dialog.
+              This action cannot be undone.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tip">
+      <strong>Tip:</strong> Row order in the <code>.pttd</code> file determines the
+      display order of processes and tasks in the PTTPlot chart. Use Move Row Up / Down
+      to arrange tasks in the desired visual sequence before rendering.
+    </div>
+  </section>
+
+  <!-- 7. CONTEXT MENUS -->
+  <section class="section" id="context-menus">
+    <h2><span class="section-num">7</span>Context Menus</h2>
+
+    <p>PTTEdit provides two context menus accessible by right-clicking within the grid.</p>
+
+    <h3>Row Number Context Menu</h3>
+
+    <p>
+      Right-click on a <strong>row number</strong> (the numeric label in the vertical
+      header at the left edge of the grid) to open the row operations menu. This menu
+      provides all row-level operations:
+    </p>
+
+    <ul>
+      <li>Move Row Up</li>
+      <li>Move Row Down</li>
+      <li>Add Row Above</li>
+      <li>Add Row Below</li>
+      <li>Copy Row</li>
+      <li>Paste Row</li>
+      <li>Delete Row</li>
+    </ul>
+
+    <h3>Process Cell Context Menu</h3>
+
+    <p>
+      Right-click on a cell in the <span class="col-label">Process</span> column to
+      open a dropdown list of all ProcessName values that currently exist in the
+      timeline. Selecting a name from this list populates the cell with that
+      ProcessName, making it easy to assign a task to an existing process without
+      typing.
+    </p>
+
+    <div class="tip">
+      <strong>Tip:</strong> The Process cell context menu is the fastest way to add
+      many tasks to the same process. It eliminates typing errors that would create
+      duplicate or misspelled process names.
+    </div>
+  </section>
+
+  <!-- 8. KEYBOARD SHORTCUTS -->
+  <section class="section" id="keyboard">
+    <h2><span class="section-num">8</span>Keyboard Shortcuts</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>O</kbd></td>
+            <td>Open a <code>.pttd</code> file</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>S</kbd></td>
+            <td>Save the current file (Save As if unsaved)</td>
+          </tr>
+          <tr>
+            <td><kbd>Tab</kbd></td>
+            <td>
+              Move focus to the next editable cell, skipping read-only columns.
+              Tab order within a row: Process &rarr; Task &rarr; Start-&fnof; &rarr;
+              End-&fnof;, then wraps to the Process column of the next row.
+            </td>
+          </tr>
+          <tr>
+            <td><kbd>Shift</kbd>+<kbd>Tab</kbd></td>
+            <td>
+              Move focus to the previous editable cell in reverse Tab order.
+            </td>
+          </tr>
+          <tr>
+            <td><kbd>Enter</kbd></td>
+            <td>
+              Confirm the current edit and move focus to the same column in the row below.
+            </td>
+          </tr>
+          <tr>
+            <td><kbd>Escape</kbd></td>
+            <td>
+              Cancel the current edit, discarding any changes typed in the active cell.
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <kbd>&uarr;</kbd>&nbsp;<kbd>&darr;</kbd>&nbsp;<kbd>&larr;</kbd>&nbsp;<kbd>&rarr;</kbd>
+            </td>
+            <td>
+              Navigate between cells in any direction. Arrow keys do not skip
+              read-only columns; use Tab to move only between editable cells.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>Note:</strong> Tab navigation skips the calculated Start, End, and
+      Duration columns. This allows rapid data entry across all four editable fields
+      of a row (Process, Task, Start-&fnof;, End-&fnof;) before advancing to the
+      next row.
+    </div>
+  </section>
+
+  <!-- 9. LAUNCHING PTTPLOT -->
+  <section class="section" id="launching">
+    <h2><span class="section-num">9</span>Launching PTTPlot</h2>
+
+    <p class="menu-path">
+      <span class="menu-item">View</span>
+      <span class="sep">&rarr;</span>
+      <span class="menu-item">Plot</span>
+    </p>
+
+    <p>
+      The <strong>View &rarr; Plot</strong> menu item launches PTTPlot with the currently
+      loaded <code>.pttd</code> file as its argument. PTTPlot renders the timeline as
+      a Gantt-style horizontal bar chart and opens in its own window.
+    </p>
+
+    <h3>Prerequisites</h3>
+
+    <ul>
+      <li>
+        The current file must be <strong>saved</strong>. PTTEdit will prompt to save
+        before launching if there are unsaved changes.
+      </li>
+      <li>
+        The timeline must have <strong>no formula errors</strong>. If any cell displays
+        an error code, the Plot command is disabled until all errors are resolved.
+      </li>
+    </ul>
+
+    <h3>How PTTPlot is Located</h3>
+
+    <p>PTTEdit searches for the PTTPlot executable in the following order:</p>
+
+    <ol>
+      <li>
+        <strong>PTTPlot.exe</strong> in the same directory as <code>pttedit.py</code>
+        (for packaged or frozen distributions).
+      </li>
+      <li>
+        <strong><code>python pttplot.py</code></strong> using the Python interpreter,
+        with <code>pttplot.py</code> in the same directory (for source installations).
+      </li>
+      <li>
+        A path explicitly configured in <code>pttedit.ini</code> under the
+        <code>[EXTERNAL_PROGRAMS]</code> section (for custom or non-standard setups).
+      </li>
+    </ol>
+
+    <p>
+      If PTTPlot is already running with the same file, a message is displayed rather
+      than launching a second instance.
+    </p>
+
+    <div class="note">
+      <strong>Note:</strong> PTTPlot includes a built-in file watcher that monitors the
+      <code>.pttd</code> file for external changes. After you save changes in PTTEdit,
+      PTTPlot automatically reloads the file and refreshes the chart without requiring
+      a manual reload.
+    </div>
+  </section>
+
+  <!-- 10. STATUS BAR -->
+  <section class="section" id="status-bar">
+    <h2><span class="section-num">10</span>Status Bar</h2>
+
+    <p>
+      The status bar runs along the bottom edge of the PTTEdit window and provides
+      real-time feedback in two zones:
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Zone</th><th>Content</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Left</strong></td>
+            <td>
+              Status messages describing the current operation, such as:
+              <em>Ready</em>, <em>Saving&hellip;</em>, <em>Recalculating&hellip;</em>,
+              <em>File loaded</em>, <em>Import complete</em>.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Right</strong></td>
+            <td>
+              Error summary indicator. Shows
+              <strong style="color:#276749;">No errors</strong> in green when the
+              grid is valid, or <strong style="color:#c53030;">Errors: N</strong> in
+              red where <em>N</em> is the count of cells containing an error code.
+              This indicator updates automatically on every recalculation.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 11. HELP MENU -->
+  <section class="section" id="help-menu">
+    <h2><span class="section-num">11</span>Help Menu</h2>
+
+    <p>The <strong>Help</strong> menu provides access to reference documentation, keyboard controls, and version and environment information.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Shortcut</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>User Guide</strong></td>
+            <td>&mdash;</td>
+            <td>Opens this User Guide HTML file in the system default web browser. If the file cannot be found, a warning dialog is displayed with the expected path.</td>
+          </tr>
+          <tr>
+            <td><strong>Instructions</strong></td>
+            <td><kbd>F1</kbd></td>
+            <td>Opens an in-application dialog summarising all file operations, editing shortcuts, and keyboard controls available in PTTEdit.</td>
+          </tr>
+          <tr>
+            <td><strong>About</strong></td>
+            <td>&mdash;</td>
+            <td>Displays a dialog with the application name, current version number, author name, company name, and copyright notice. The dialog is shown with the PTTEdit application icon.</td>
+          </tr>
+          <tr>
+            <td><strong>System Information</strong></td>
+            <td>&mdash;</td>
+            <td>Displays a detailed environment dialog showing the Python interpreter version, installed module versions (PySide6, matplotlib, pandas, numpy, json5), operating system name and version, and resolved file system paths (application directory, library directory, INI configuration file). Useful when reporting bugs or confirming dependency versions.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <strong>PTTimeline v0.3.0</strong> &mdash; PTTEdit User Guide
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PTTPlot User Guide — PTTimeline v0.3.0</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: #1a202c;
+    background: #f7fafc;
+    padding: 2rem 1rem;
+  }
+
+  .page-wrapper {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* ── Page Header ── */
+  .page-header {
+    background: #2c5282;
+    color: #fff;
+    border-radius: 10px;
+    padding: 2.5rem 2.5rem 2rem;
+    margin-bottom: 2rem;
+  }
+  .page-header .app-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #90cdf4;
+    margin-bottom: 0.4rem;
+  }
+  .page-header h1 {
+    font-size: 2.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    line-height: 1.2;
+  }
+  .page-header .subtitle {
+    font-size: 1rem;
+    color: #bee3f8;
+    font-weight: 400;
+  }
+  .data-flow {
+    margin-top: 1.4rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+  }
+  .data-flow .step {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 5px;
+    padding: 0.2rem 0.7rem;
+    font-weight: 500;
+    color: #fff;
+  }
+  .data-flow .step.current {
+    background: #3182ce;
+    border-color: #63b3ed;
+  }
+  .data-flow .arrow {
+    color: #90cdf4;
+    font-size: 1rem;
+  }
+
+  /* ── TOC ── */
+  .toc-card {
+    background: #fff;
+    border: 1px solid #bee3f8;
+    border-left: 4px solid #3182ce;
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 4px rgba(44,82,130,0.07);
+  }
+  .toc-card h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2c5282;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 1rem;
+  }
+  .toc-card ol {
+    list-style: none;
+    counter-reset: toc;
+    columns: 2;
+    column-gap: 2rem;
+  }
+  @media (max-width: 600px) { .toc-card ol { columns: 1; } }
+  .toc-card ol li {
+    counter-increment: toc;
+    padding: 0.18rem 0;
+  }
+  .toc-card ol li::before {
+    content: counter(toc) ".";
+    color: #3182ce;
+    font-weight: 700;
+    margin-right: 0.45rem;
+    min-width: 1.4rem;
+    display: inline-block;
+  }
+  .toc-card a {
+    color: #2c5282;
+    text-decoration: none;
+    font-size: 0.92rem;
+  }
+  .toc-card a:hover { color: #3182ce; text-decoration: underline; }
+
+  /* ── Section Cards ── */
+  .section {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 1.75rem;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+    scroll-margin-top: 1rem;
+  }
+  .section h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #2c5282;
+    border-bottom: 2px solid #bee3f8;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .section h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #2c5282;
+    margin: 1.4rem 0 0.6rem;
+  }
+  .section h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin: 1rem 0 0.4rem;
+  }
+  .section p { margin-bottom: 0.85rem; }
+  .section ul, .section ol {
+    margin: 0.5rem 0 0.85rem 1.5rem;
+  }
+  .section li { margin-bottom: 0.3rem; }
+
+  .section-num {
+    display: inline-block;
+    background: #2c5282;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 4px;
+    padding: 0.05rem 0.45rem;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+  }
+
+  /* ── kbd ── */
+  kbd {
+    display: inline-block;
+    background: #e2e8f0;
+    border: 1px solid #cbd5e0;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0.1rem 0.5rem;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.82rem;
+    color: #2d3748;
+    white-space: nowrap;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.12);
+  }
+
+  /* ── code / pre ── */
+  code {
+    background: #f0f4f8;
+    color: #2c5282;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.875rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #1a202c;
+    color: #e2e8f0;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.855rem;
+    line-height: 1.6;
+    border-radius: 7px;
+    padding: 1.1rem 1.4rem;
+    overflow-x: auto;
+    margin: 0.75rem 0 1rem;
+  }
+  pre code {
+    background: none;
+    color: inherit;
+    font-size: inherit;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+  }
+  .sc { color: #718096; }  /* syntax: comment */
+  .sk { color: #90cdf4; }  /* syntax: key */
+  .sv { color: #fbd38d; }  /* syntax: value */
+  .ss { color: #9ae6b4; }  /* syntax: string highlight */
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin: 0.75rem 0 1rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  thead tr {
+    background: #2c5282;
+    color: #fff;
+  }
+  thead th {
+    padding: 0.65rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+  }
+  tbody tr:nth-child(even) { background: #f7fafc; }
+  tbody tr:hover { background: #ebf8ff; }
+  tbody td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+
+  /* ── Callout boxes ── */
+  .note {
+    background: #ebf8ff;
+    border-left: 4px solid #3182ce;
+    border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1.1rem;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.9rem;
+    color: #2c5282;
+  }
+  .note strong { color: #2c5282; }
+  .warning {
+    background: #fffaf0;
+    border-left: 4px solid #dd6b20;
+    border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1.1rem;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.9rem;
+    color: #7b341e;
+  }
+  .warning strong { color: #c05621; }
+
+  /* ── Tier accent colours ── */
+  .tier-1 { color: #553c9a; font-weight: 600; }
+  .tier-2 { color: #276749; font-weight: 600; }
+  .tier-3 { color: #c05621; font-weight: 600; }
+  .tier-4 { color: #b7791f; font-weight: 600; }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    color: #718096;
+    font-size: 0.82rem;
+    padding: 2rem 0 1rem;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 1rem;
+  }
+  footer strong { color: #4a5568; }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- PAGE HEADER -->
+  <header class="page-header">
+    <div class="app-label">PTTimeline v0.3.0</div>
+    <h1>PTTPlot User Guide</h1>
+    <div class="subtitle">Timeline Chart Plotter &mdash; Gantt-style horizontal bar charts from .pttd data files</div>
+    <div class="data-flow">
+      <span class="step">PTTEdit</span>
+      <span class="arrow">&#8594;</span>
+      <span class="step current">PTTPlot</span>
+      <span class="arrow">&#8594;</span>
+      <span class="step">PTTView</span>
+    </div>
+  </header>
+
+  <!-- TABLE OF CONTENTS -->
+  <nav class="toc-card" aria-label="Table of Contents">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#interface">Interface Overview</a></li>
+      <li><a href="#file-ops">File Operations</a></li>
+      <li><a href="#presentation">Presentation Menu</a></li>
+      <li><a href="#mouse-wheel">Mouse Wheel Controls</a></li>
+      <li><a href="#click-controls">Click Controls</a></li>
+      <li><a href="#zoom-toolbar">Zoom Controls Toolbar</a></li>
+      <li><a href="#auto-reload">Auto-Reload (File Watcher)</a></li>
+      <li><a href="#help-menu">Help Menu</a></li>
+      <li><a href="#keyboard">Keyboard Shortcuts</a></li>
+      <li><a href="#configuration">Configuration System</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1. OVERVIEW -->
+  <section class="section" id="overview">
+    <h2><span class="section-num">1</span>Overview</h2>
+    <p>
+      PTTPlot is the rendering engine of the PTTimeline suite. It reads <code>.pttd</code> timeline
+      data files produced by PTTEdit and renders interactive Gantt-style horizontal bar charts using
+      matplotlib embedded in a PySide6 window.
+    </p>
+    <p>
+      Charts can be explored interactively &mdash; zoomed, panned, annotated with task info popups,
+      and decorated with dependency arrows &mdash; then exported to PNG, JPG, PDF, or SVG for sharing
+      or archiving. Exported images can be opened directly in PTTView for further zoom and inspection.
+    </p>
+
+    <h3>Typical Workflow</h3>
+    <ol>
+      <li>Use <strong>PTTEdit</strong> to create or edit a <code>.pttd</code> timeline data file.</li>
+      <li>Open the file in <strong>PTTPlot</strong> via <kbd>File</kbd> &#8594; <kbd>Open</kbd>, or
+          pass it on the command line.</li>
+      <li>Adjust presentation options, inspect dependency arrows, and annotate tasks as needed.</li>
+      <li>Export the chart via <kbd>File</kbd> &#8594; <kbd>Save</kbd> to PNG, JPG, PDF, or SVG.</li>
+      <li>View the exported image in <strong>PTTView</strong> by choosing <em>Save &amp; View</em>
+          from the save dialog.</li>
+    </ol>
+
+    <h3>Command-Line Usage</h3>
+    <p>PTTPlot can be launched with or without a file argument:</p>
+    <pre><code>python pttplot.py
+python pttplot.py path/to/file.pttd</code></pre>
+    <p>
+      When a filename is provided, the chart renders immediately on startup. Without a filename,
+      PTTPlot opens to a blank window and waits for a file to be opened via the menu.
+    </p>
+  </section>
+
+  <!-- 2. INTERFACE OVERVIEW -->
+  <section class="section" id="interface">
+    <h2><span class="section-num">2</span>Interface Overview</h2>
+    <p>The main window has four main areas:</p>
+
+    <h3>Menu Bar</h3>
+    <p>
+      Three menus are available: <strong>File</strong>, <strong>Presentation</strong>, and
+      <strong>Help</strong>. All major operations are accessible from the menu bar.
+    </p>
+
+    <h3>Chart Canvas</h3>
+    <p>
+      The central area displays the matplotlib canvas containing the rendered Gantt chart. Process
+      names appear on the vertical axis. The horizontal axis represents time. Task bars are drawn as
+      horizontal rectangles, color-coded by process.
+    </p>
+    <p>
+      Each task bar is interactive &mdash; right-clicking on a bar shows a task info annotation, and
+      Ctrl-clicking reveals dependency arrows. See <a href="#click-controls">Click Controls</a> for
+      the full reference.
+    </p>
+
+    <h3>Zoom Controls Toolbar</h3>
+    <p>
+      A matplotlib navigation toolbar can optionally be shown below the menu bar. It is
+      <strong>hidden by default</strong>. Enable it via <kbd>Help</kbd> &#8594; <kbd>Zoom Controls</kbd>.
+      When visible, it enables mouse-wheel zoom and pan. See <a href="#zoom-toolbar">Zoom Controls
+      Toolbar</a>.
+    </p>
+
+    <h3>Status Feedback</h3>
+    <p>
+      Save progress and completion are communicated through window title changes. During a save
+      operation the title updates to reflect the current state, then returns to normal on completion.
+    </p>
+
+    <div class="note">
+      <strong>File Watcher:</strong> When a <code>.pttd</code> file is loaded, PTTPlot continuously
+      monitors it for external changes. If the file is modified by another application (for example,
+      by saving from PTTEdit), the chart automatically reloads and re-renders. This behaviour can
+      be toggled on or off using <strong>Presentation &rarr; Re-Plot On PTTD Change</strong>.
+      See <a href="#auto-reload">Auto-Reload</a>.
+    </div>
+  </section>
+
+  <!-- 3. FILE OPERATIONS -->
+  <section class="section" id="file-ops">
+    <h2><span class="section-num">3</span>File Operations</h2>
+    <p>All file operations are available under the <kbd>File</kbd> menu.</p>
+
+    <h3>Open</h3>
+    <p>
+      Opens a standard file browser to select a <code>.pttd</code> file. Once selected, the chart
+      renders immediately. Any previously loaded file is replaced.
+    </p>
+
+    <h3>Save Formats</h3>
+    <p>Four export formats are available under <kbd>File</kbd> &#8594; <kbd>Save</kbd>:</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Extension</th>
+            <th>Resolution</th>
+            <th>Output Size</th>
+            <th>Tight Crop</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>PNG</strong></td>
+            <td><code>.png</code></td>
+            <td>300 DPI</td>
+            <td>16.5 &times; 10.5 in</td>
+            <td>Yes</td>
+            <td>Lossless raster; best for on-screen use</td>
+          </tr>
+          <tr>
+            <td><strong>JPEG</strong></td>
+            <td><code>.jpg</code></td>
+            <td>300 DPI</td>
+            <td>16.5 &times; 10.5 in</td>
+            <td>Yes</td>
+            <td>Compressed raster; smaller file size</td>
+          </tr>
+          <tr>
+            <td><strong>PDF</strong></td>
+            <td><code>.pdf</code></td>
+            <td>300 DPI</td>
+            <td>16.5 &times; 10.5 in</td>
+            <td>Yes</td>
+            <td>Print-ready; embeds vector text and lines</td>
+          </tr>
+          <tr>
+            <td><strong>SVG</strong></td>
+            <td><code>.svg</code></td>
+            <td>N/A (vector)</td>
+            <td>N/A</td>
+            <td>No</td>
+            <td>Fully scalable vector; DPI setting is not applied</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>SVG note:</strong> SVG exports do not use tight cropping. The
+      <code>bbox_inches='tight'</code> parameter is applied for PNG, JPG, and PDF only.
+      Using tight cropping with SVG in Qt's <code>QSvgWidget</code> causes rendering failures,
+      so it is intentionally skipped for that format.
+    </div>
+
+    <h3>The Save Dialog</h3>
+    <p>
+      PTTPlot uses a custom save dialog (not the native OS file picker) that provides three buttons:
+    </p>
+    <ul>
+      <li><strong>Save</strong> &mdash; Writes the file to disk and closes the dialog.</li>
+      <li><strong>Save &amp; View</strong> &mdash; Saves the file, then opens the exported image in
+          PTTView (or the configured external viewer for PDF and SVG).</li>
+      <li><strong>Cancel</strong> &mdash; Closes the dialog without saving.</li>
+    </ul>
+
+    <h3>Zoom State During Export</h3>
+    <p>
+      Exports always render the <strong>full chart</strong> (zoomed out to show all data), regardless
+      of the current zoom or pan level. After the export completes, the canvas is restored to the zoom
+      state it was in before saving.
+    </p>
+
+    <h3>Exit</h3>
+    <p>
+      Closes the PTTPlot application. No unsaved chart data is lost &mdash; the chart is regenerated
+      from the source <code>.pttd</code> file each time it is loaded.
+    </p>
+  </section>
+
+  <!-- 4. PRESENTATION MENU -->
+  <section class="section" id="presentation">
+    <h2><span class="section-num">4</span>Presentation Menu</h2>
+    <p>
+      The <kbd>Presentation</kbd> menu controls how task bars and labels are displayed, and provides
+      commands for loading and saving named presentation configurations. Changes to layout options take
+      effect immediately, re-rendering the chart.
+    </p>
+
+    <h3>Open&hellip;</h3>
+    <p>
+      Opens a dialog listing all <code>.pttp</code> presentation files found in the same directory as
+      the currently loaded <code>.pttd</code> file. Presentation files are named using a
+      <em>dot-qualifier</em> convention:
+    </p>
+    <ul>
+      <li><code>sample.{}.pttp</code> &mdash; the default (unnamed) presentation</li>
+      <li><code>sample.{overview}.pttp</code> &mdash; a named presentation called <em>overview</em></li>
+      <li><code>sample.{detail}.pttp</code> &mdash; a named presentation called <em>detail</em></li>
+    </ul>
+    <p>
+      Selecting a presentation from the list reloads the chart with that presentation's configuration.
+      The current presentation name is highlighted in the list so you can see which one is active.
+      This item is disabled until a file is loaded.
+    </p>
+
+    <h3>Save&hellip;</h3>
+    <p>
+      Opens a dialog where you can type a presentation name (alphanumeric, underscore, hyphen; leave
+      blank for the unnamed default). PTTPlot saves the current configuration to a
+      <code>basename.{name}.pttp</code> file in the same directory as the <code>.pttd</code> file.
+      If a file with that name already exists, you are prompted to confirm overwrite.
+      This item is disabled until a file is loaded.
+    </p>
+
+    <h3>Re-Plot On PTTD Change</h3>
+    <p>
+      A checkable menu item that controls whether PTTPlot automatically reloads and re-renders the
+      chart when the <code>.pttd</code> file is modified by an external application (such as PTTEdit).
+      When checked, the file watcher is active and live-preview mode is enabled. When unchecked, the
+      file watcher is paused and the chart is not updated until the item is re-checked or the file is
+      manually reopened. This item is disabled until a file is loaded.
+    </p>
+
+    <div class="note">
+      <strong>Tip:</strong> Keep <strong>Re-Plot On PTTD Change</strong> checked while actively editing
+      in PTTEdit to get an automatic live preview. Uncheck it temporarily if you need to prevent
+      re-renders while making multiple rapid changes.
+    </div>
+
+    <h3>Name: {&hellip;}</h3>
+    <p>
+      A read-only label (shown as a disabled menu item) displaying the name of the currently loaded
+      presentation in braces. For example, <code>Name: {}</code> indicates the unnamed default
+      presentation is active; <code>Name: {overview}</code> indicates the <em>overview</em>
+      presentation. This updates automatically when a different presentation is loaded.
+    </p>
+
+    <h3>Stacking Submenu</h3>
+    <p>Controls how tasks are arranged vertically within each process row.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Behaviour</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Stacked</strong></td>
+            <td>
+              All tasks belonging to the same process share the same horizontal row. If two tasks
+              overlap in time, they are stacked vertically within that row (one above the other).
+              This produces a compact layout.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Unstacked</strong></td>
+            <td>
+              Every task gets its own dedicated horizontal row, regardless of time overlap. Process
+              tasks are grouped together but never share a row. This produces a more spread-out
+              layout where all tasks are individually legible.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Labels Submenu</h3>
+    <p>Controls the position and orientation of task name labels drawn inside the bars.</p>
+
+    <h4>Horizontal Alignment</h4>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Behaviour</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Left Justified</strong></td>
+            <td>Task label text is anchored to the left edge of each bar.</td>
+          </tr>
+          <tr>
+            <td><strong>Center Justified</strong></td>
+            <td>Task label text is centered horizontally within each bar.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>Label Rotation</h4>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Angle</th><th>Appearance</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Rotation Horizontal (0&deg;)</strong></td>
+            <td>0&deg;</td>
+            <td>Labels display flat and horizontal &mdash; easiest to read for long bars.</td>
+          </tr>
+          <tr>
+            <td><strong>Rotation Slanted (45&deg;)</strong></td>
+            <td>45&deg;</td>
+            <td>Labels are angled at 45&deg; &mdash; useful when bars are narrow.</td>
+          </tr>
+          <tr>
+            <td><strong>Rotation Vertical (90&deg;)</strong></td>
+            <td>90&deg;</td>
+            <td>Labels are rotated 90&deg; (reading bottom-to-top) &mdash; maximises use of narrow bars.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 5. MOUSE WHEEL CONTROLS -->
+  <section class="section" id="mouse-wheel">
+    <h2><span class="section-num">5</span>Mouse Wheel Controls</h2>
+
+    <div class="warning">
+      <strong>Prerequisite:</strong> Mouse wheel zoom and pan are only active when the
+      <strong>Zoom Controls toolbar is visible</strong>. Enable it via
+      <kbd>Help</kbd> &#8594; <kbd>Zoom Controls</kbd>. When the toolbar is hidden, the scroll
+      wheel has no effect on the chart.
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Gesture</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>Wheel Up</kbd> / <kbd>Wheel Down</kbd></td>
+            <td>Pan the chart <strong>up or down</strong> (vertically) by 10% of the currently
+                visible range per scroll tick.</td>
+          </tr>
+          <tr>
+            <td><kbd>Shift</kbd> + <kbd>Wheel</kbd></td>
+            <td>Pan the chart <strong>left or right</strong> (horizontally) by 10% of the currently
+                visible range per scroll tick.</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd> + <kbd>Wheel Up</kbd></td>
+            <td><strong>Zoom in</strong>, centered on the current cursor position.</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd> + <kbd>Wheel Down</kbd></td>
+            <td><strong>Zoom out</strong>, centered on the current cursor position.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Panning Limits</h3>
+    <p>
+      Panning is <strong>clamped to the full data range</strong>. You cannot pan beyond the chart
+      boundaries &mdash; once the edge of the data is reached, further panning in that direction stops.
+    </p>
+
+    <h3>Zoom Limits</h3>
+    <p>
+      Zooming out is clamped to the <strong>initial full view</strong> (the view that shows all data).
+      You cannot zoom out beyond the full chart extent.
+    </p>
+
+    <h3>Restoring the Full View</h3>
+    <p>
+      After zooming in with <kbd>Ctrl</kbd> + <kbd>Wheel</kbd>, click the <strong>Home</strong>
+      button in the Zoom Controls toolbar to restore the initial full-chart view instantly.
+    </p>
+  </section>
+
+  <!-- 6. CLICK CONTROLS -->
+  <section class="section" id="click-controls">
+    <h2><span class="section-num">6</span>Click Controls</h2>
+    <p>
+      PTTPlot supports several mouse click interactions directly on the chart canvas. Most gestures
+      require clicking on a <strong>task bar</strong> (a rendered horizontal rectangle). Clicks on
+      empty canvas areas are ignored, with the exception of the "toggle all" gestures noted below.
+    </p>
+
+    <h3>Task Info Annotations</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Gesture</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>Right-Click</kbd> on bar</td>
+            <td>
+              Toggle a task info annotation box showing <strong>Process</strong>,
+              <strong>Task</strong>, <strong>Start</strong>, <strong>End</strong>, and
+              <strong>Duration</strong>. Clicking the same bar again removes the annotation.
+            </td>
+          </tr>
+          <tr>
+            <td><kbd>Alt</kbd> + <kbd>Right-Click</kbd> on bar</td>
+            <td>
+              Toggle a task info annotation that additionally shows the
+              <strong>formula expressions</strong> used to compute the start and end values,
+              displayed as <em>Start-&#402;</em> and <em>End-&#402;</em>. Useful for debugging
+              formula-driven timelines.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Dependency Arrows</h3>
+    <p>
+      Dependency arrows visualize relationships between tasks: which tasks feed into a given task
+      (predecessors) and which tasks a given task feeds into (successors).
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Gesture</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>Ctrl</kbd> + <kbd>Left-Click</kbd> on bar</td>
+            <td>
+              Toggle <strong>predecessor arrows</strong> for the clicked task &mdash; draws arrows
+              from the tasks that feed <em>into</em> this task.
+            </td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd> + <kbd>Right-Click</kbd> on bar</td>
+            <td>
+              Toggle <strong>successor arrows</strong> for the clicked task &mdash; draws arrows
+              from this task <em>out to</em> the tasks it feeds.
+            </td>
+          </tr>
+          <tr>
+            <td><kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>Left-Click</kbd> anywhere</td>
+            <td>
+              Toggle <strong>predecessor arrows for all tasks</strong> at once. If any predecessor
+              arrows are currently visible, all are removed; otherwise predecessor arrows are shown
+              for every task in the chart.
+            </td>
+          </tr>
+          <tr>
+            <td><kbd>Shift</kbd> + <kbd>Ctrl</kbd> + <kbd>Right-Click</kbd> anywhere</td>
+            <td>
+              Toggle <strong>successor arrows for all tasks</strong> at once. If any successor
+              arrows are currently visible, all are removed; otherwise successor arrows are shown
+              for every task in the chart.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Notes on Dependency Arrows</h3>
+    <ul>
+      <li>Arrows are rendered as <strong>filled arrowhead patches</strong> drawn over the chart bars
+          (z-order above bars).</li>
+      <li>Arrow colour is a slightly <strong>darkened version</strong> of the source task bar's
+          colour.</li>
+      <li>When the source and destination bars are <strong>adjacent in time on the same row</strong>,
+          the arrow spans both bars with a larger arrowhead to indicate the direct dependency.</li>
+      <li>Predecessor and successor arrows are <strong>independent</strong> &mdash; both types can be
+          displayed simultaneously on the same task bar.</li>
+      <li>The <kbd>Shift</kbd>+<kbd>Ctrl</kbd> "toggle all" gestures work anywhere on the canvas,
+          not only on bars.</li>
+    </ul>
+  </section>
+
+  <!-- 7. ZOOM CONTROLS TOOLBAR -->
+  <section class="section" id="zoom-toolbar">
+    <h2><span class="section-num">7</span>Zoom Controls Toolbar</h2>
+    <p>
+      PTTPlot includes the standard matplotlib navigation toolbar. It is <strong>hidden by default</strong>
+      to keep the interface clean. Toggle it on or off via <kbd>Help</kbd> &#8594; <kbd>Zoom Controls</kbd>.
+    </p>
+
+    <div class="note">
+      <strong>Note:</strong> Mouse-wheel scroll zoom and pan are only active while the toolbar is
+      visible. Hiding the toolbar also disables scroll-wheel interaction with the chart.
+    </div>
+
+    <h3>Toolbar Buttons</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Button</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Home</strong></td>
+            <td>Restore the initial full view &mdash; resets both axes to show all chart data.
+                Use this after zooming in to return to the full overview.</td>
+          </tr>
+          <tr>
+            <td><strong>Back</strong></td>
+            <td>Navigate backward through the zoom/pan history, restoring the previous view state.</td>
+          </tr>
+          <tr>
+            <td><strong>Forward</strong></td>
+            <td>Navigate forward through the zoom/pan history, re-applying a view that was navigated
+                away from via Back.</td>
+          </tr>
+          <tr>
+            <td><strong>Zoom to Rectangle</strong></td>
+            <td>Click and drag on the canvas to define a rectangular region. The chart zooms in to
+                show only that region. Click the button again to deactivate the tool.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Toggling the Toolbar</h3>
+    <p>
+      <kbd>Help</kbd> &#8594; <kbd>Zoom Controls</kbd> acts as a toggle. A checkmark next to the
+      menu item indicates the toolbar is currently visible. Selecting it again hides the toolbar
+      and disables wheel-based interaction.
+    </p>
+  </section>
+
+  <!-- 8. AUTO-RELOAD -->
+  <section class="section" id="auto-reload">
+    <h2><span class="section-num">8</span>Auto-Reload (File Watcher)</h2>
+    <p>
+      PTTPlot monitors the currently loaded <code>.pttd</code> file for external modifications
+      using Qt's <code>QFileSystemWatcher</code>. This enables a live-preview workflow between
+      PTTEdit and PTTPlot.
+    </p>
+
+    <h3>How It Works</h3>
+    <ol>
+      <li>When a file is loaded successfully, PTTPlot registers it with the file watcher and
+          enables the <strong>Presentation &rarr; Re-Plot On PTTD Change</strong> menu item.</li>
+      <li>If the file is modified externally (for example, saved from PTTEdit), PTTPlot receives a
+          change notification.</li>
+      <li>A <strong>200&nbsp;ms delay</strong> is applied before reloading. This accommodates editors
+          that save by deleting the original file and recreating it &mdash; the delay allows the new
+          file to be fully written before PTTPlot reads it.</li>
+      <li>After the delay, PTTPlot reloads the file from disk and re-renders the chart.</li>
+      <li>If the file was recreated (rather than modified in place), PTTPlot automatically
+          re-registers the new file with the watcher so monitoring continues.</li>
+    </ol>
+
+    <h3>Enabling and Disabling the File Watcher</h3>
+    <p>
+      The <strong>Presentation &rarr; Re-Plot On PTTD Change</strong> menu item is a checkable
+      toggle. When checked (the default after a successful file load), the file watcher is active.
+      When unchecked, the watcher is paused and the chart will not update automatically until
+      monitoring is re-enabled. If the <code>.pttd</code> file is modified while monitoring is
+      paused, PTTPlot will reload it the next time monitoring is re-enabled.
+    </p>
+
+    <div class="warning">
+      <strong>Note:</strong> If the monitored file is deleted or becomes unavailable, PTTPlot
+      automatically disables file monitoring and displays a warning. Open an existing
+      <code>.pttd</code> file to restore monitoring.
+    </div>
+
+    <h3>Live Editing Workflow</h3>
+    <p>
+      Open the same <code>.pttd</code> file in both PTTEdit and PTTPlot simultaneously. Each time
+      you save in PTTEdit, PTTPlot automatically updates the chart &mdash; no manual reload step
+      required.
+    </p>
+
+    <div class="note">
+      <strong>Note:</strong> The file watcher monitors only the currently loaded file. If you open
+      a different file in PTTPlot, the watcher switches to monitor the new file.
+    </div>
+  </section>
+
+  <!-- 9. HELP MENU -->
+  <section class="section" id="help-menu">
+    <h2><span class="section-num">9</span>Help Menu</h2>
+    <p>The <kbd>Help</kbd> menu provides access to reference documentation, in-application controls, and application details.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Shortcut</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>User Guide</strong></td>
+            <td>&mdash;</td>
+            <td>Opens this User Guide HTML file in the system default web browser. If the file cannot be found, a warning dialog is displayed with the expected path.</td>
+          </tr>
+          <tr>
+            <td><strong>Instructions</strong></td>
+            <td><kbd>F1</kbd></td>
+            <td>Opens a dialog summarising all mouse click gestures and keyboard controls available
+                in PTTPlot.</td>
+          </tr>
+          <tr>
+            <td><strong>Zoom Controls</strong></td>
+            <td>&mdash;</td>
+            <td>Toggles the matplotlib navigation toolbar. A checkmark indicates the toolbar is
+                currently visible. See <a href="#zoom-toolbar">Zoom Controls Toolbar</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>About</strong></td>
+            <td>&mdash;</td>
+            <td>Displays the application version, author, company, and copyright information.</td>
+          </tr>
+          <tr>
+            <td><strong>System Information</strong></td>
+            <td>&mdash;</td>
+            <td>Shows detailed environment information: Python version, installed module versions
+                (PySide6, matplotlib, pandas, numpy, json5), operating system, and relevant
+                file paths.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10. KEYBOARD SHORTCUTS -->
+  <section class="section" id="keyboard">
+    <h2><span class="section-num">10</span>Keyboard Shortcuts</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>F1</kbd></td>
+            <td>Open the Instructions help dialog (shows all mouse and keyboard controls).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>Note:</strong> Standard OS-level window management shortcuts (such as
+      <kbd>Alt</kbd>+<kbd>F4</kbd> to close on Windows) remain available as provided by the
+      operating system and Qt window framework.
+    </div>
+  </section>
+
+  <!-- 11. CONFIGURATION -->
+  <section class="section" id="configuration">
+    <h2><span class="section-num">11</span>Configuration System</h2>
+    <p>
+      PTTPlot uses a <strong>3-tier configuration system</strong>. Settings cascade from lowest to
+      highest priority, with higher tiers overriding lower ones. Before loading each new file,
+      configuration is reset to tiers 1 and 2 (the baseline), then tier 3 is applied on
+      top of that baseline.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tier</th>
+            <th>Source</th>
+            <th>Scope</th>
+            <th>Priority</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="tier-1">1</td>
+            <td>Hardcoded defaults in <code>pttplot.py</code></td>
+            <td>All files</td>
+            <td class="tier-1">Lowest</td>
+          </tr>
+          <tr>
+            <td class="tier-2">2</td>
+            <td><code>pttplot.ini</code> &mdash; user-level INI file (stored in the user config directory)</td>
+            <td>All files</td>
+            <td class="tier-2">Low</td>
+          </tr>
+          <tr>
+            <td class="tier-3">3</td>
+            <td><code>&lt;basename&gt;.{&lt;name&gt;}.pttp</code> &mdash; per-file presentation config (same directory as <code>.pttd</code>)</td>
+            <td>One file / presentation</td>
+            <td class="tier-3">Highest</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Presentation File Naming</h3>
+    <p>
+      Each <code>.pttd</code> file can have multiple named presentation files, each stored as a
+      separate <code>.pttp</code> file using a <em>dot-qualifier</em> naming convention:
+    </p>
+    <pre><code><span class="sk">sample.{}.pttp</span>           <span class="sc">; default (unnamed) presentation</span>
+<span class="sk">sample.{overview}.pttp</span>   <span class="sc">; presentation named "overview"</span>
+<span class="sk">sample.{detail}.pttp</span>     <span class="sc">; presentation named "detail"</span></code></pre>
+    <p>
+      When a <code>.pttd</code> file is first loaded and no matching <code>.pttp</code> file exists,
+      PTTPlot automatically creates <code>basename.{}.pttp</code> from the current baseline
+      configuration. Use <strong>Presentation &rarr; Save&hellip;</strong> to create additional
+      named presentations.
+    </p>
+
+    <div class="note">
+      <strong>Note:</strong> Curly braces (<code>{</code> and <code>}</code>) are reserved for
+      presentation qualifiers and <strong>cannot</strong> appear in <code>.pttd</code> filenames.
+      PTTPlot will reject any attempt to open a <code>.pttd</code> file whose name contains braces.
+    </div>
+
+    <h3>INI File Rules</h3>
+    <p>All INI files consumed by PTTPlot follow these conventions:</p>
+    <ul>
+      <li>Parser: <code>configparser.RawConfigParser</code> &mdash; no <code>%</code> interpolation,
+          which preserves values like <code>25%</code> as literal text.</li>
+      <li>Comment character: <strong>semicolon (<code>;</code>) only</strong>. The hash character
+          (<code>#</code>) is <strong>not</strong> treated as a comment &mdash; this allows hex
+          colour values such as <code>#ff0000</code> to appear in INI values without any escaping.</li>
+      <li>Files are always read with <code>encoding='utf-8'</code> to avoid issues on Windows
+          systems where the default encoding is cp1252.</li>
+    </ul>
+
+    <pre><code><span class="sc">; pttplot.ini example</span>
+<span class="sc">; Use semicolons for comments -- # is NOT a comment character in this parser</span>
+
+[ANNOTATIONS.MARKERS]
+<span class="sk">marker_linestyle</span> = <span class="sv">dashed</span>
+<span class="sk">marker_color</span>     = <span class="sv">#2c5282</span>    <span class="sc">; hex colors work correctly -- # is not a comment</span>
+<span class="sk">marker_fontsize</span>  = <span class="sv">9</span>
+<span class="sk">marker_position</span>  = <span class="sv">25%</span>         <span class="sc">; % is preserved literally by RawConfigParser</span>
+
+<span class="sk">marker1</span> = <span class="sv">Project Start, 0,  solid,  1.5, #276749, 10, italic, Top, 90</span>
+<span class="sk">marker2</span> = <span class="sv">Milestone A,  30, dashed, 1,   #c05621, 9,  normal, 25%, 0</span></code></pre>
+
+    <h3>Annotation Markers</h3>
+    <p>
+      Markers are vertical reference lines with optional text labels. They are defined in the
+      <code>[ANNOTATIONS.MARKERS]</code> section of any INI file. Markers from the global
+      <code>pttplot.ini</code> and a per-file <code>.pttp</code> file are <strong>merged</strong>
+      rather than replaced &mdash; a per-file <code>.pttp</code> can add new markers without removing
+      the globally defined ones.
+    </p>
+
+    <h4>Marker Key Naming</h4>
+    <p>
+      Each marker key must start with <code>marker</code> followed immediately by a digit
+      (e.g., <code>marker1</code>, <code>marker2</code>, <code>marker10</code>). Keys using
+      the <code>marker_</code> prefix (with an underscore) are section-level defaults, not
+      individual markers, and are treated differently.
+    </p>
+
+    <h4>Marker Definition Format</h4>
+    <p>Each marker is one INI line with 9 comma-separated fields:</p>
+
+    <pre><code>marker<span class="ss">N</span> = <span class="sv">label, time, linestyle, linewidth, color, fontsize, fontstyle, position, rotation</span></code></pre>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Accepted Values</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>label</strong></td>
+            <td>string</td>
+            <td>Text displayed next to the marker line. Leave blank for a line with no label.</td>
+            <td><code>Project Start</code>, <code>Go-Live</code>, or empty</td>
+          </tr>
+          <tr>
+            <td><strong>time</strong></td>
+            <td>number</td>
+            <td>Horizontal position of the marker, in the same time units as the chart data.</td>
+            <td><code>0</code>, <code>30</code>, <code>-5</code>, <code>14.5</code></td>
+          </tr>
+          <tr>
+            <td><strong>linestyle</strong></td>
+            <td>string</td>
+            <td>Style of the vertical line drawn at the marker position.</td>
+            <td><code>solid</code>, <code>dashed</code>, <code>dotted</code>, <code>dashdot</code>, <code>None</code></td>
+          </tr>
+          <tr>
+            <td><strong>linewidth</strong></td>
+            <td>number</td>
+            <td>Width of the vertical line in points. Use <code>0</code> to hide the line while keeping the label visible.</td>
+            <td><code>1</code>, <code>1.5</code>, <code>0</code></td>
+          </tr>
+          <tr>
+            <td><strong>color</strong></td>
+            <td>string</td>
+            <td>Colour applied to both the line and the label text. Accepts any matplotlib colour string or hex value.</td>
+            <td><code>#2c5282</code>, <code>red</code>, <code>tab:blue</code></td>
+          </tr>
+          <tr>
+            <td><strong>fontsize</strong></td>
+            <td>number</td>
+            <td>Font size of the label text in points.</td>
+            <td><code>9</code>, <code>10</code>, <code>11</code></td>
+          </tr>
+          <tr>
+            <td><strong>fontstyle</strong></td>
+            <td>string</td>
+            <td>Font style of the label text.</td>
+            <td><code>normal</code>, <code>italic</code>, <code>bold</code></td>
+          </tr>
+          <tr>
+            <td><strong>position</strong></td>
+            <td>string</td>
+            <td>Vertical position of the label along the marker line.</td>
+            <td><code>Top</code>, <code>Bottom</code>, <code>Center</code>, <code>25%</code> (percent from bottom)</td>
+          </tr>
+          <tr>
+            <td><strong>rotation</strong></td>
+            <td>number</td>
+            <td>
+              Label text rotation angle. <code>0</code> = vertical, reading bottom-to-top.
+              <code>90</code> = horizontal, reading left-to-right.
+            </td>
+            <td><code>0</code>, <code>45</code>, <code>90</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>Blank fields:</strong> Any field left blank (two consecutive commas) inherits its
+      value from the section-level <code>marker_*</code> default for that field.
+    </div>
+
+    <h4>Section-Level Defaults</h4>
+    <p>
+      Set defaults that apply to all markers in the section using <code>marker_*</code> prefix keys.
+      Individual marker fields that are left blank will inherit these defaults:
+    </p>
+    <pre><code>[ANNOTATIONS.MARKERS]
+<span class="sk">marker_linestyle</span> = <span class="sv">dashed</span>
+<span class="sk">marker_linewidth</span> = <span class="sv">1</span>
+<span class="sk">marker_color</span>     = <span class="sv">#555555</span>
+<span class="sk">marker_fontsize</span>  = <span class="sv">9</span>
+<span class="sk">marker_fontstyle</span> = <span class="sv">normal</span>
+<span class="sk">marker_position</span>  = <span class="sv">Top</span>
+<span class="sk">marker_rotation</span>  = <span class="sv">90</span>
+
+<span class="sc">; marker2 overrides only color and position; all other fields use section defaults:</span>
+<span class="sk">marker2</span> = <span class="sv">Milestone B, 45, , , #c05621, , , 25%,</span></code></pre>
+
+    <h4>Removing a Global Marker in a Per-File Presentation</h4>
+    <p>
+      To suppress a marker defined in the global <code>pttplot.ini</code> for a specific
+      presentation, assign the marker key an empty value in the <code>.pttp</code> file:
+    </p>
+    <pre><code><span class="sc">; Suppress marker1 that was defined in pttplot.ini for this presentation only:</span>
+<span class="sk">marker1</span> =</code></pre>
+
+    <h3>Color Lists</h3>
+    <p>
+      Process bar colours are defined as a comma-separated list in the INI configuration. Each
+      entry is validated against matplotlib's colour parser. If the list is empty or contains
+      invalid colour values, PTTPlot falls back to matplotlib's <code>tab20</code> colour map,
+      which automatically assigns distinct colours to each process.
+    </p>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <strong>PTTimeline v0.3.0</strong> &mdash; PTTPlot User Guide
+  </footer>
+
+</div>
+</body>
+</html>

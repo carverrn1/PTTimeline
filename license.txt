@@ -1,0 +1,10 @@
+PTTimeline - Pre-release Development Software
+Copyright (c) 2026 RNCSoftware. All rights reserved.
+
+This software is provided for evaluation and testing purposes only.
+It is not for public redistribution or commercial use.
+
+This is pre-release software and may contain bugs or incomplete features.
+No warranty is expressed or implied. Use at your own risk.
+
+For questions or feedback, contact RNCSoftware.

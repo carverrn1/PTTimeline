@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PTTView User Guide &mdash; PTTimeline v0.3.0</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: #1a202c;
+    background: #f7fafc;
+    padding: 2rem 1rem;
+  }
+
+  .page-wrapper {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* ── Page Header ── */
+  .page-header {
+    background: #2c5282;
+    color: #fff;
+    border-radius: 10px;
+    padding: 2.5rem 2.5rem 2rem;
+    margin-bottom: 2rem;
+  }
+  .page-header .app-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #90cdf4;
+    margin-bottom: 0.4rem;
+  }
+  .page-header h1 {
+    font-size: 2.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    line-height: 1.2;
+  }
+  .page-header .subtitle {
+    font-size: 1rem;
+    color: #bee3f8;
+    font-weight: 400;
+  }
+  .data-flow {
+    margin-top: 1.4rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.875rem;
+  }
+  .data-flow .step {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 5px;
+    padding: 0.2rem 0.7rem;
+    font-weight: 500;
+    color: #fff;
+  }
+  .data-flow .step.current {
+    background: #3182ce;
+    border-color: #63b3ed;
+  }
+  .data-flow .arrow {
+    color: #90cdf4;
+    font-size: 1rem;
+  }
+
+  /* ── TOC ── */
+  .toc-card {
+    background: #fff;
+    border: 1px solid #bee3f8;
+    border-left: 4px solid #3182ce;
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 4px rgba(44,82,130,0.07);
+  }
+  .toc-card h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2c5282;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 1rem;
+  }
+  .toc-card ol {
+    list-style: none;
+    counter-reset: toc;
+    columns: 2;
+    column-gap: 2rem;
+  }
+  @media (max-width: 600px) { .toc-card ol { columns: 1; } }
+  .toc-card ol li {
+    counter-increment: toc;
+    padding: 0.18rem 0;
+  }
+  .toc-card ol li::before {
+    content: counter(toc) ".";
+    color: #3182ce;
+    font-weight: 700;
+    margin-right: 0.45rem;
+    min-width: 1.4rem;
+    display: inline-block;
+  }
+  .toc-card a {
+    color: #2c5282;
+    text-decoration: none;
+    font-size: 0.92rem;
+  }
+  .toc-card a:hover { color: #3182ce; text-decoration: underline; }
+
+  /* ── Section Cards ── */
+  .section {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 1.75rem;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.05);
+    scroll-margin-top: 1rem;
+  }
+  .section h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #2c5282;
+    border-bottom: 2px solid #bee3f8;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .section h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #2c5282;
+    margin: 1.4rem 0 0.6rem;
+  }
+  .section h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #4a5568;
+    margin: 1rem 0 0.4rem;
+  }
+  .section p { margin-bottom: 0.85rem; }
+  .section ul, .section ol {
+    margin: 0.5rem 0 0.85rem 1.5rem;
+  }
+  .section li { margin-bottom: 0.3rem; }
+
+  .section-num {
+    display: inline-block;
+    background: #2c5282;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-radius: 4px;
+    padding: 0.05rem 0.45rem;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+  }
+
+  /* ── kbd ── */
+  kbd {
+    display: inline-block;
+    background: #e2e8f0;
+    border: 1px solid #cbd5e0;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 0.1rem 0.5rem;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.82rem;
+    color: #2d3748;
+    white-space: nowrap;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.12);
+  }
+
+  /* ── code / pre ── */
+  code {
+    background: #f0f4f8;
+    color: #2c5282;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.875rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+  }
+  pre {
+    background: #1a202c;
+    color: #e2e8f0;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.855rem;
+    line-height: 1.6;
+    border-radius: 7px;
+    padding: 1.1rem 1.4rem;
+    overflow-x: auto;
+    margin: 0.75rem 0 1rem;
+  }
+  pre code {
+    background: none;
+    color: inherit;
+    font-size: inherit;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+  }
+  .sc { color: #718096; }  /* syntax: comment */
+  .sk { color: #90cdf4; }  /* syntax: key */
+  .sv { color: #fbd38d; }  /* syntax: value */
+  .ss { color: #9ae6b4; }  /* syntax: string highlight */
+
+  /* ── Tables ── */
+  .table-wrap { overflow-x: auto; margin: 0.75rem 0 1rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  thead tr {
+    background: #2c5282;
+    color: #fff;
+  }
+  thead th {
+    padding: 0.65rem 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+  }
+  tbody tr:nth-child(even) { background: #f7fafc; }
+  tbody tr:hover { background: #ebf8ff; }
+  tbody td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+
+  /* ── Callout boxes ── */
+  .note {
+    background: #ebf8ff;
+    border-left: 4px solid #3182ce;
+    border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1.1rem;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.9rem;
+    color: #2c5282;
+  }
+  .note strong { color: #2c5282; }
+  .warning {
+    background: #fffaf0;
+    border-left: 4px solid #dd6b20;
+    border-radius: 0 6px 6px 0;
+    padding: 0.8rem 1.1rem;
+    margin: 0.75rem 0 1rem;
+    font-size: 0.9rem;
+    color: #7b341e;
+  }
+  .warning strong { color: #c05621; }
+
+  /* ── Tier accent colours ── */
+  .tier-1 { color: #553c9a; font-weight: 600; }
+  .tier-2 { color: #276749; font-weight: 600; }
+  .tier-3 { color: #c05621; font-weight: 600; }
+  .tier-4 { color: #b7791f; font-weight: 600; }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    color: #718096;
+    font-size: 0.82rem;
+    padding: 2rem 0 1rem;
+    border-top: 1px solid #e2e8f0;
+    margin-top: 1rem;
+  }
+  footer strong { color: #4a5568; }
+
+  /* ── PTTView-specific: Group label rows in shortcut table ── */
+  tr.group-row td {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #718096;
+    background: #f7fafc;
+    padding: 0.4rem 1rem 0.25rem;
+    border-top: 1px solid #e2e8f0;
+  }
+  tr.group-row:first-child td {
+    border-top: none;
+  }
+
+  /* ── PTTView-specific: Status bar illustration ── */
+  .status-bar-demo {
+    background: #2d3748;
+    border-radius: 6px;
+    padding: 0.45rem 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 0.8rem;
+    margin: 0.75rem 0 1rem;
+    color: #e2e8f0;
+  }
+  .status-bar-demo .left { color: #90cdf4; }
+  .status-bar-demo .right { color: #68d391; }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- PAGE HEADER -->
+  <header class="page-header">
+    <div class="app-label">PTTimeline v0.3.0</div>
+    <h1>PTTView User Guide</h1>
+    <div class="subtitle">Timeline Image Viewer &mdash; Smooth zoom, pan, and thumbnail navigation for exported timeline plots</div>
+    <div class="data-flow">
+      <span class="step">PTTEdit</span>
+      <span class="arrow">&#8594;</span>
+      <span class="step">PTTPlot</span>
+      <span class="arrow">&#8594;</span>
+      <span class="step current">PTTView</span>
+    </div>
+  </header>
+
+  <!-- TABLE OF CONTENTS -->
+  <nav class="toc-card" aria-label="Table of Contents">
+    <h2>Table of Contents</h2>
+    <ol>
+      <li><a href="#sec-formats">Supported File Formats</a></li>
+      <li><a href="#sec-interface">Interface Overview</a></li>
+      <li><a href="#sec-launch">Launching PTTView</a></li>
+      <li><a href="#sec-file-ops">File Operations</a></li>
+      <li><a href="#sec-zoom">Zoom Operations</a></li>
+      <li><a href="#sec-pan">Panning &amp; Scrolling</a></li>
+      <li><a href="#sec-navigator">Map Navigator</a></li>
+      <li><a href="#sec-view">View Controls</a></li>
+      <li><a href="#sec-shortcuts">Keyboard Shortcuts</a></li>
+      <li><a href="#sec-help">Help Menu</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1. SUPPORTED FILE FORMATS -->
+  <section class="section" id="sec-formats">
+    <h2><span class="section-num">1</span>Supported File Formats</h2>
+
+    <p>PTTView can open the following image and document formats. The format is determined by the file extension.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Format</th>
+            <th>Extensions</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>SVG</strong></td>
+            <td><code>.svg</code>, <code>.svgz</code></td>
+            <td>Vector format; rendered by the Qt SVG engine. Some advanced SVG features (CSS filters, complex gradients) may not render correctly due to Qt limitations. The DOCTYPE declaration is stripped automatically on load to prevent Qt from attempting a network fetch.</td>
+          </tr>
+          <tr>
+            <td><strong>PNG</strong></td>
+            <td><code>.png</code></td>
+            <td>Lossless raster format. Recommended for high-quality chart exports.</td>
+          </tr>
+          <tr>
+            <td><strong>JPEG</strong></td>
+            <td><code>.jpg</code>, <code>.jpeg</code></td>
+            <td>Lossy raster format. Suitable for screen viewing; not recommended where text sharpness is critical.</td>
+          </tr>
+          <tr>
+            <td><strong>Bitmap</strong></td>
+            <td><code>.bmp</code></td>
+            <td>Uncompressed raster format.</td>
+          </tr>
+          <tr>
+            <td><strong>GIF</strong></td>
+            <td><code>.gif</code></td>
+            <td>Raster format; only the first frame is displayed.</td>
+          </tr>
+          <tr>
+            <td><strong>TIFF</strong></td>
+            <td><code>.tif</code>, <code>.tiff</code></td>
+            <td>Raster format commonly used in print workflows.</td>
+          </tr>
+          <tr>
+            <td><strong>WebP</strong></td>
+            <td><code>.webp</code></td>
+            <td>Modern raster format; requires a Qt build with WebP support.</td>
+          </tr>
+          <tr>
+            <td><strong>PDF</strong></td>
+            <td><code>.pdf</code></td>
+            <td>Requires the <code>PyMuPDF</code> library (<code>pip install pymupdf</code>). Only the first page is rendered. Zoom quality is recalculated dynamically from the zoom percentage, capped at 600 DPI.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>Note:</strong> If <code>PyMuPDF</code> is not installed, attempting to open a PDF file will display an error message. Install it with <code>pip install pymupdf</code> and restart PTTView.
+    </div>
+
+    <div class="warning">
+      <strong>SVG rendering:</strong> Qt's SVG renderer does not implement the full SVG 1.1 specification. Plots exported from PTTPlot are designed to be compatible, but third-party SVG files may not display correctly. For complex SVGs, export to PNG instead.
+    </div>
+  </section>
+
+  <!-- 2. INTERFACE OVERVIEW -->
+  <section class="section" id="sec-interface">
+    <h2><span class="section-num">2</span>Interface Overview</h2>
+
+    <p>The PTTView window is composed of three main areas:</p>
+
+    <h3>Image Canvas</h3>
+    <p>The central area of the window. The loaded image is displayed on a scrollable canvas. When a file is first opened, the image is automatically scaled to fit the window (Fit to Window mode). The canvas supports both mouse-driven panning via the scroll wheel and keyboard-driven panning via the arrow keys.</p>
+
+    <h3>Status Bar</h3>
+    <p>A thin bar at the bottom of the window that provides two pieces of information at all times:</p>
+    <div class="status-bar-demo" aria-label="Status bar illustration">
+      <span class="left">my_timeline_chart.svg &nbsp;&nbsp;&nbsp; Press F1 for help</span>
+      <span class="right">Zoom: 85%</span>
+    </div>
+    <ul>
+      <li><strong>Bottom-left:</strong> The filename of the currently loaded image, followed by a reminder that <kbd>F1</kbd> opens the help dialog.</li>
+      <li><strong>Bottom-right:</strong> The current zoom level as a percentage (for example, <em>Zoom: 85%</em>).</li>
+    </ul>
+
+    <h3>Window Title Bar</h3>
+    <p>When a file is loaded, the window title changes from <em>PTTView</em> to <em>PTTView &mdash; filename</em>, where <em>filename</em> is the base name of the loaded file. This makes it easy to identify the file when PTTView is running alongside other applications.</p>
+
+    <h3>Menu Bar</h3>
+    <p>Contains two menus:</p>
+    <ul>
+      <li><strong>File</strong> &mdash; Open a file, or exit the application.</li>
+      <li><strong>Help</strong> &mdash; Access the User Guide, the Instructions dialog, the About box, and the System Information dialog.</li>
+    </ul>
+
+    <h3>Toolbar</h3>
+    <p>A toolbar below the menu bar provides quick access to the most common zoom operations as clickable buttons: <strong>Zoom In (+)</strong> and <strong>Zoom Out (-)</strong>. These are equivalent to the <kbd>Ctrl</kbd>+<kbd>+</kbd> and <kbd>Ctrl</kbd>+<kbd>-</kbd> keyboard shortcuts. The toolbar is always visible and cannot be hidden.</p>
+  </section>
+
+  <!-- 3. LAUNCHING PTTVIEW -->
+  <section class="section" id="sec-launch">
+    <h2><span class="section-num">3</span>Launching PTTView</h2>
+
+    <h3>From the Command Line</h3>
+    <p>PTTView accepts an optional image file path as a command-line argument:</p>
+    <pre><code>python pttview.py [image_file]</code></pre>
+
+    <p>Examples:</p>
+    <pre><code><span class="sc"># Open a specific SVG file</span>
+python pttview.py my_timeline.svg
+
+<span class="sc"># Open a PNG export</span>
+python pttview.py output/project_chart.png
+
+<span class="sc"># Start with an empty viewer (no file loaded)</span>
+python pttview.py</code></pre>
+
+    <p>Any supported file format can be passed on the command line. If the file path contains spaces, enclose it in quotes.</p>
+
+    <h3>From PTTPlot</h3>
+    <p>PTTView is designed to be launched automatically by PTTPlot after a chart is exported. When you use the <em>Save &amp; View</em> option in PTTPlot, PTTPlot saves the plot file and then opens PTTView to display the result. No manual command-line invocation is required in this workflow.</p>
+
+    <h3>Starting with an Empty Viewer</h3>
+    <p>If no file argument is provided, PTTView opens with an empty canvas. Use <kbd>Ctrl</kbd>+<kbd>O</kbd> to open a file via the file dialog.</p>
+  </section>
+
+  <!-- 4. FILE OPERATIONS -->
+  <section class="section" id="sec-file-ops">
+    <h2><span class="section-num">4</span>File Operations</h2>
+
+    <p>File operations are available from the <strong>File</strong> menu.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Operation</th>
+            <th>Shortcut</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Open</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>O</kbd></td>
+            <td>Opens a file dialog filtered to all supported image formats. Select any supported file to load it into the viewer. If a file is already open, it is replaced by the new selection.</td>
+          </tr>
+          <tr>
+            <td><strong>Exit</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td>
+            <td>Closes the PTTView application. Equivalent to pressing <kbd>Escape</kbd> or closing the window via the title bar.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>File Dialog Filter</h3>
+    <p>The Open file dialog presents a combined filter for all supported formats, so you can navigate to any supported image file without adjusting the filter. Individual format filters are also provided for convenience.</p>
+
+    <div class="note">
+      <strong>Note:</strong> PTTView does not modify or write to any file. It is a read-only viewer. Opening a file simply loads it into the display canvas.
+    </div>
+  </section>
+
+  <!-- 5. ZOOM OPERATIONS -->
+  <section class="section" id="sec-zoom">
+    <h2><span class="section-num">5</span>Zoom Operations</h2>
+
+    <p>PTTView supports a zoom range of <strong>5% minimum</strong> to <strong>500% maximum</strong>. The current zoom level is always shown in the status bar at the bottom-right of the window.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Operation</th>
+            <th>Keyboard / Mouse</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Zoom in 15%</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>+</kbd> or <kbd>Ctrl</kbd>+<kbd>=</kbd></td>
+            <td>Increases zoom by 15 percentage points, centred on the middle of the visible canvas area.</td>
+          </tr>
+          <tr>
+            <td><strong>Zoom out 15%</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>-</kbd></td>
+            <td>Decreases zoom by 15 percentage points, centred on the middle of the visible canvas area.</td>
+          </tr>
+          <tr>
+            <td><strong>Fit to window</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>0</kbd></td>
+            <td>Scales the image so that it fits within the current window size with a 20-pixel margin on all sides. This is the default zoom level when a file is first opened.</td>
+          </tr>
+          <tr>
+            <td><strong>Actual size</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>1</kbd></td>
+            <td>Resets zoom to 100% (1:1 pixel mapping for raster images). Useful for checking fine detail.</td>
+          </tr>
+          <tr>
+            <td><strong>Custom zoom</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td>
+            <td>Opens a dialog where you can type any zoom percentage from 5 to 500. The image is recentred after the zoom is applied.</td>
+          </tr>
+          <tr>
+            <td><strong>Mouse wheel zoom</strong></td>
+            <td><kbd>Ctrl</kbd>+Mouse Wheel</td>
+            <td>Zooms in or out while keeping the point currently under the mouse cursor stationary in the viewport. The image pivots around the cursor position for precise, intuitive zooming.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>PDF Zoom Quality</h3>
+    <p>For PDF files, PTTView does not simply scale a fixed raster image. Instead, it re-renders the PDF page at a resolution derived from the current zoom level. The render DPI is calculated proportionally to the zoom percentage and is capped at <strong>600 DPI</strong> to balance visual quality with memory and performance. Zooming in on a PDF therefore produces a progressively sharper image rather than an upscaled one.</p>
+
+    <h3>Zoom Limits</h3>
+    <p>Zoom is clamped at the boundaries: attempting to zoom below 5% or above 500% has no further effect. The status bar always reflects the current zoom percentage.</p>
+
+    <div class="note">
+      <strong>Tip:</strong> Use <kbd>Ctrl</kbd>+<kbd>0</kbd> (Fit to Window) any time you want a full overview of the chart after zooming into a detail area.
+    </div>
+  </section>
+
+  <!-- 6. PANNING & SCROLLING -->
+  <section class="section" id="sec-pan">
+    <h2><span class="section-num">6</span>Panning &amp; Scrolling</h2>
+
+    <p>When the image is larger than the visible window (that is, when zoomed in beyond Fit to Window), you can pan to explore different regions using the mouse wheel or the keyboard arrow keys.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Gesture / Key</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><kbd>Wheel Up</kbd> / <kbd>Wheel Down</kbd></td>
+            <td>Pan up or down through the image.</td>
+          </tr>
+          <tr>
+            <td><kbd>Shift</kbd>+Mouse Wheel</td>
+            <td>Pan left or right through the image.</td>
+          </tr>
+          <tr>
+            <td><kbd>&#8593;</kbd> Arrow Up</td>
+            <td>Pan the view upward.</td>
+          </tr>
+          <tr>
+            <td><kbd>&#8595;</kbd> Arrow Down</td>
+            <td>Pan the view downward.</td>
+          </tr>
+          <tr>
+            <td><kbd>&#8592;</kbd> Arrow Left</td>
+            <td>Pan the view to the left.</td>
+          </tr>
+          <tr>
+            <td><kbd>&#8594;</kbd> Arrow Right</td>
+            <td>Pan the view to the right.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <strong>Note:</strong> Panning is only meaningful when the image extends beyond the visible window. At Fit to Window zoom level, the entire image is already visible and scrolling has no effect.
+    </div>
+  </section>
+
+  <!-- 7. MAP NAVIGATOR -->
+  <section class="section" id="sec-navigator">
+    <h2><span class="section-num">7</span>Map Navigator</h2>
+
+    <p>The Map Navigator provides a birds-eye thumbnail overview of the full image. It is especially useful when zoomed into a detail area and you want to jump to a different region without manually scrolling.</p>
+
+    <h3>Opening the Navigator</h3>
+    <p>Press <kbd>Ctrl</kbd>+<kbd>M</kbd> to open the Map Navigator dialog. There is no menu item for this feature; it is accessible by keyboard only.</p>
+
+    <h3>Using the Navigator</h3>
+    <ul>
+      <li>The dialog displays a scaled-down thumbnail of the full image.</li>
+      <li>The thumbnail is scaled so that its longest side is at most <strong>400 pixels</strong>, preserving the original aspect ratio.</li>
+      <li>Click anywhere on the thumbnail to instantly centre the main view on that location in the image.</li>
+      <li>The main canvas scrolls immediately to bring the clicked region into view.</li>
+    </ul>
+
+    <h3>Non-Blocking Dialog</h3>
+    <p>The Map Navigator dialog is non-blocking &mdash; you can leave it open while continuing to work in the main window. Click different spots on the thumbnail repeatedly to navigate around the image. Close the dialog when you no longer need it.</p>
+
+    <div class="note">
+      <strong>Tip:</strong> The Map Navigator is most useful at high zoom levels (above 100%) where only a small portion of a large chart is visible in the main window. Click directly on the region of interest in the thumbnail to jump there immediately.
+    </div>
+  </section>
+
+  <!-- 8. VIEW CONTROLS -->
+  <section class="section" id="sec-view">
+    <h2><span class="section-num">8</span>View Controls</h2>
+
+    <p>Additional view controls are available via keyboard shortcuts to manage the image position and display mode.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Operation</th>
+            <th>Keyboard</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Centre image</strong></td>
+            <td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td>
+            <td>Centres the image within the visible canvas at the current zoom level. Useful after panning to bring the image back to a centred position without changing the zoom.</td>
+          </tr>
+          <tr>
+            <td><strong>Toggle fullscreen</strong></td>
+            <td><kbd>F11</kbd></td>
+            <td>Switches the PTTView window between normal windowed mode and fullscreen. Press <kbd>F11</kbd> again to return to windowed mode. The image is automatically reflowed to fit the new window size.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Fullscreen Mode</h3>
+    <p>Fullscreen mode maximises the available canvas area by hiding the operating system title bar and taskbar. The menu bar and status bar remain visible. This is useful for presenting or reviewing a chart on a large display. All keyboard shortcuts continue to function while in fullscreen mode.</p>
+
+    <div class="note">
+      <strong>Tip:</strong> Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> after toggling fullscreen to re-centre the image in the newly expanded canvas area.
+    </div>
+  </section>
+
+  <!-- 9. KEYBOARD SHORTCUTS -->
+  <section class="section" id="sec-shortcuts">
+    <h2><span class="section-num">9</span>Keyboard Shortcuts</h2>
+
+    <p>All PTTView keyboard shortcuts are listed below. Shortcuts are available regardless of which UI element has focus.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Key Combination</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="group-row"><td colspan="2">File</td></tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>O</kbd></td>
+            <td>Open file dialog</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>Q</kbd></td>
+            <td>Exit PTTView</td>
+          </tr>
+          <tr>
+            <td><kbd>Escape</kbd></td>
+            <td>Close the viewer (same as Exit)</td>
+          </tr>
+
+          <tr class="group-row"><td colspan="2">Zoom</td></tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>+</kbd> &nbsp;/&nbsp; <kbd>Ctrl</kbd>+<kbd>=</kbd></td>
+            <td>Zoom in 15%</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>-</kbd></td>
+            <td>Zoom out 15%</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>0</kbd></td>
+            <td>Fit to window</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>1</kbd></td>
+            <td>Actual size (100%)</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td>
+            <td>Set custom zoom percentage (opens dialog)</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+Mouse Wheel</td>
+            <td>Zoom in / out centred on cursor position</td>
+          </tr>
+
+          <tr class="group-row"><td colspan="2">Panning</td></tr>
+          <tr>
+            <td>Mouse Wheel</td>
+            <td>Pan up / down</td>
+          </tr>
+          <tr>
+            <td><kbd>Shift</kbd>+Mouse Wheel</td>
+            <td>Pan left / right</td>
+          </tr>
+          <tr>
+            <td><kbd>&#8593;</kbd> Arrow Up</td>
+            <td>Pan view upward</td>
+          </tr>
+          <tr>
+            <td><kbd>&#8595;</kbd> Arrow Down</td>
+            <td>Pan view downward</td>
+          </tr>
+          <tr>
+            <td><kbd>&#8592;</kbd> Arrow Left</td>
+            <td>Pan view to the left</td>
+          </tr>
+          <tr>
+            <td><kbd>&#8594;</kbd> Arrow Right</td>
+            <td>Pan view to the right</td>
+          </tr>
+
+          <tr class="group-row"><td colspan="2">View</td></tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td>
+            <td>Centre image in canvas</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>M</kbd></td>
+            <td>Open Map Navigator thumbnail dialog</td>
+          </tr>
+          <tr>
+            <td><kbd>F11</kbd></td>
+            <td>Toggle fullscreen mode</td>
+          </tr>
+
+          <tr class="group-row"><td colspan="2">Help</td></tr>
+          <tr>
+            <td><kbd>F1</kbd></td>
+            <td>Show Instructions help dialog</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10. HELP MENU -->
+  <section class="section" id="sec-help">
+    <h2><span class="section-num">10</span>Help Menu</h2>
+
+    <p>The <strong>Help</strong> menu provides four items with reference and diagnostic information.</p>
+
+    <h3>User Guide</h3>
+    <p>Opens this User Guide HTML file in the system default web browser. If the file cannot be found at its expected path, a warning dialog is displayed.</p>
+
+    <h3>Instructions &nbsp;<kbd>F1</kbd></h3>
+    <p>Opens a concise in-application reference listing all controls and keyboard shortcuts. This is the quickest way to recall a shortcut without leaving PTTView. The same dialog is shown when pressing <kbd>F1</kbd> at any time from the main window.</p>
+
+    <h3>About</h3>
+    <p>Displays the PTTView About dialog, which includes:</p>
+    <ul>
+      <li>Application version number</li>
+      <li>Author and company name</li>
+      <li>Copyright notice</li>
+    </ul>
+
+    <h3>System Information</h3>
+    <p>Displays a detailed system information dialog that is useful for diagnosing environment issues or reporting bugs. It includes:</p>
+    <ul>
+      <li>Python version and interpreter path</li>
+      <li>Versions of key installed modules (PySide6, PyMuPDF, and others)</li>
+      <li>Operating system name and version</li>
+      <li>Relevant file paths (application directory, library directory)</li>
+    </ul>
+
+    <div class="note">
+      <strong>Tip:</strong> Copy the contents of the System Information dialog when reporting bugs, as it captures the exact environment in which PTTView is running.
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <strong>PTTimeline v0.3.0</strong> &mdash; PTTView User Guide
+  </footer>
+
+</div>
+</body>
+</html>

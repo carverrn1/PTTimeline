@@ -1,0 +1,74 @@
+[PLOTTING]
+window_maximized_bool = False
+title_text = Process-Task Timeline
+x_axis_label = Time
+y_axis_label = Processes
+set_major_locator_float = 1.0
+set_minor_locator_float = 0.1
+x_axis_min_float = -0.1
+x_axis_max_float = 48.1
+exclude_hbar_groups = ['']
+save_dpi_int = 300
+
+[PRESENTATION]
+hbar_stacking = Stacked
+hbar_label_justified = Center
+hbar_label_rotation = Horizontal
+dependency_arrow_mode = Time
+show_predecessors_bool = False
+show_successors_bool = True
+
+[COLORS]
+color_list = #1f77b4,
+	#aec7e8,
+	#ff7f0e,
+	#ffbb78,
+	#2ca02c,
+	#98df8a,
+	#d62728,
+	#ff9896,
+	#9467bd,
+	#c5b0d5,
+	#8c564b,
+	#c49c94,
+	#e377c2,
+	#f7b6d2,
+	#7f7f7f,
+	#c7c7c7,
+	#bcbd22,
+	#dbdb8d,
+	#17becf,
+	#9edae5
+
+[ANNOTATIONS.MARKER_DEFAULTS]
+marker_linestyle = dashed
+marker_linewidth_float = 1.0
+marker_color = red
+marker_fontsize_float = 7.0
+marker_fontstyle = Normal
+marker_position = top
+marker_rotation_float = 0.0
+
+[ANNOTATIONS.MARKERS]
+marker0 = ←0.0 (NOTE: This demo Marker is defined in pttplot.ini. Remove 'marker0' in pttplot.ini OR define 'marker0=' in this plot's INI),0.0,dotted,6,red,10,italic,top,90
+
+; ==============================================================================
+; PROCESS_ATTRIBUTES Section
+; ==============================================================================
+; Per-process attribute overrides. Applies on top of [COLORS].color_list
+; palette assignment. ProcessName must match the PTTD exactly (case-sensitive).
+; Unknown process names and unknown attribute names are ignored (debug-logged).
+;
+; Format:  ProcessName = color=#rrggbb
+;
+[PROCESS_ATTRIBUTES]
+LOCKSTEPS = color=#ffff7f
+X_Axis = color=#ff5500
+Y_Axis = color=#ff7f0e
+XY_Gantry = color=#ffbb78
+Z1_Pipettor = color=#2ca02c
+Syringe_Z1 = color=#98df8a
+Z2_Pipettor = color=#d62728
+Syringe_Z2 = color=#ff9896
+Process_Path = color=#9467bd
+Reagent1 = color=#c5b0d5
