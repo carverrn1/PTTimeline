@@ -273,10 +273,9 @@ def _parse_marker_position(position_str):
 def _load_markers_from_ini(ini_cfg, config):
     """
     Parse marker definitions from [ANNOTATIONS.MARKERS] in ini_cfg and
-    update config in place.  New key names use suffixes:
-      marker_linewidth_float, marker_fontsize_float, marker_rotation_float
-    String keys (marker_linestyle, marker_color, marker_fontstyle,
-    marker_position) have no suffix.
+    update config in place.  Numeric keys use suffixes:
+      linewidth_float, fontsize_float, rotation_float
+    String keys (linestyle, color, fontstyle, position) have no suffix.
     Returns updated config.
     """
     from matplotlib.colors import is_color_like
@@ -301,21 +300,21 @@ def _load_markers_from_ini(ini_cfg, config):
         except (ValueError, TypeError):
             return fallback
 
-    # Update marker_* defaults from [ANNOTATIONS.MARKER_DEFAULTS] in INI
-    config[DEFAULTS_SECTION]['marker_linestyle']       = _get('marker_linestyle',       config[DEFAULTS_SECTION]['marker_linestyle'])
-    config[DEFAULTS_SECTION]['marker_linewidth_float'] = _getfloat('marker_linewidth_float', config[DEFAULTS_SECTION]['marker_linewidth_float'])
-    config[DEFAULTS_SECTION]['marker_color']           = _get('marker_color',           config[DEFAULTS_SECTION]['marker_color'])
-    config[DEFAULTS_SECTION]['marker_fontsize_float']  = _getfloat('marker_fontsize_float',  config[DEFAULTS_SECTION]['marker_fontsize_float'])
-    config[DEFAULTS_SECTION]['marker_position']        = _get('marker_position',        config[DEFAULTS_SECTION]['marker_position'])
-    config[DEFAULTS_SECTION]['marker_rotation_float']  = _getfloat('marker_rotation_float',  config[DEFAULTS_SECTION]['marker_rotation_float'])
+    # Update defaults from [ANNOTATIONS.MARKER_DEFAULTS] in INI
+    config[DEFAULTS_SECTION]['linestyle']       = _get('linestyle',       config[DEFAULTS_SECTION]['linestyle'])
+    config[DEFAULTS_SECTION]['linewidth_float'] = _getfloat('linewidth_float', config[DEFAULTS_SECTION]['linewidth_float'])
+    config[DEFAULTS_SECTION]['color']           = _get('color',           config[DEFAULTS_SECTION]['color'])
+    config[DEFAULTS_SECTION]['fontsize_float']  = _getfloat('fontsize_float',  config[DEFAULTS_SECTION]['fontsize_float'])
+    config[DEFAULTS_SECTION]['position']        = _get('position',        config[DEFAULTS_SECTION]['position'])
+    config[DEFAULTS_SECTION]['rotation_float']  = _getfloat('rotation_float',  config[DEFAULTS_SECTION]['rotation_float'])
 
-    fontstyle_str = _get('marker_fontstyle', config[DEFAULTS_SECTION]['marker_fontstyle']).strip().title()
+    fontstyle_str = _get('fontstyle', config[DEFAULTS_SECTION]['fontstyle']).strip().title()
     if _parse_fontstyle(fontstyle_str) is None:
-        print(f"WARNING: Invalid marker_fontstyle '{fontstyle_str}', using Normal")
+        print(f"WARNING: Invalid fontstyle '{fontstyle_str}', using Normal")
         fontstyle_str = 'Normal'
-    config[DEFAULTS_SECTION]['marker_fontstyle'] = fontstyle_str
+    config[DEFAULTS_SECTION]['fontstyle'] = fontstyle_str
 
-    # Helper: field is blank or equals the marker_* default key name
+    # Helper: field is blank or equals the default key name
     def _is_default(field_val, default_key_name):
         return not field_val or field_val.lower() == default_key_name.lower()
 
@@ -355,8 +354,8 @@ def _load_markers_from_ini(ini_cfg, config):
 
             # Field 2: linestyle
             ls_raw = parts[2]
-            if _is_default(ls_raw, 'marker_linestyle'):
-                ls_raw = config[DEFAULTS_SECTION]['marker_linestyle']
+            if _is_default(ls_raw, 'linestyle'):
+                ls_raw = config[DEFAULTS_SECTION]['linestyle']
             linestyle = VALID_LINESTYLES.get(ls_raw.lower())
             if linestyle is None:
                 print(f"WARNING: Marker '{marker_name}' invalid linestyle '{parts[2]}'. Skipping.")
@@ -364,8 +363,8 @@ def _load_markers_from_ini(ini_cfg, config):
 
             # Field 3: linewidth
             lw_raw = parts[3]
-            if _is_default(lw_raw, 'marker_linewidth_float'):
-                marker_linewidth = config[DEFAULTS_SECTION]['marker_linewidth_float']
+            if _is_default(lw_raw, 'linewidth_float'):
+                marker_linewidth = config[DEFAULTS_SECTION]['linewidth_float']
             else:
                 try:
                     marker_linewidth = float(lw_raw)
@@ -375,16 +374,16 @@ def _load_markers_from_ini(ini_cfg, config):
 
             # Field 4: color
             color = parts[4]
-            if _is_default(color, 'marker_color'):
-                color = config[DEFAULTS_SECTION]['marker_color']
+            if _is_default(color, 'color'):
+                color = config[DEFAULTS_SECTION]['color']
             if not is_color_like(color):
                 print(f"WARNING: Marker '{marker_name}' invalid color '{color}'. Skipping.")
                 continue
 
             # Field 5: fontsize
             fs_raw = parts[5]
-            if _is_default(fs_raw, 'marker_fontsize_float'):
-                marker_fontsize = config[DEFAULTS_SECTION]['marker_fontsize_float']
+            if _is_default(fs_raw, 'fontsize_float'):
+                marker_fontsize = config[DEFAULTS_SECTION]['fontsize_float']
             else:
                 try:
                     marker_fontsize = float(fs_raw)
@@ -394,8 +393,8 @@ def _load_markers_from_ini(ini_cfg, config):
 
             # Field 6: fontstyle
             fst_raw = parts[6]
-            if _is_default(fst_raw, 'marker_fontstyle'):
-                marker_fontstyle = config[DEFAULTS_SECTION]['marker_fontstyle']
+            if _is_default(fst_raw, 'fontstyle'):
+                marker_fontstyle = config[DEFAULTS_SECTION]['fontstyle']
             else:
                 marker_fontstyle = fst_raw.title()
                 if _parse_fontstyle(marker_fontstyle) is None:
@@ -404,8 +403,8 @@ def _load_markers_from_ini(ini_cfg, config):
 
             # Field 7: position
             pos_raw = parts[7]
-            if _is_default(pos_raw, 'marker_position'):
-                pos_raw = config[DEFAULTS_SECTION]['marker_position']
+            if _is_default(pos_raw, 'position'):
+                pos_raw = config[DEFAULTS_SECTION]['position']
             marker_position = _parse_marker_position(pos_raw)
             if marker_position is None:
                 print(f"WARNING: Marker '{marker_name}' invalid position '{parts[7]}'. Skipping.")
@@ -413,8 +412,8 @@ def _load_markers_from_ini(ini_cfg, config):
 
             # Field 8: rotation
             rot_raw = parts[8]
-            if _is_default(rot_raw, 'marker_rotation_float'):
-                marker_rotation = config[DEFAULTS_SECTION]['marker_rotation_float']
+            if _is_default(rot_raw, 'rotation_float'):
+                marker_rotation = config[DEFAULTS_SECTION]['rotation_float']
             else:
                 try:
                     marker_rotation = float(rot_raw)
@@ -424,6 +423,8 @@ def _load_markers_from_ini(ini_cfg, config):
 
             fontweight, fontstyle = _parse_fontstyle(marker_fontstyle)
 
+            # Replace any existing marker with the same key (e.g. pttp overrides pttplot.ini)
+            markers = [m for m in markers if m.get('key') != key]
             markers.append({
                 'key':        key,
                 'name':       marker_name,

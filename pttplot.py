@@ -156,25 +156,25 @@ color_list =
 ; ANNOTATIONS.MARKER_DEFAULTS Section for pttplot.ini
 ; ==============================================================================
 ; Default attribute values applied to all markers when a per-marker field is
-; blank or set to the marker_* key name.
+; blank or set to the key name.
 ;
-;   marker_linestyle        - Line style (default: dashed)
-;   marker_linewidth_float  - Line width; 0 = invisible line (default: 1)
-;   marker_color            - Line and label color (default: red)
-;   marker_fontsize_float   - Font size for marker labels (default: 7)
-;   marker_fontstyle        - Font style: Normal, Bold, Italic, Bold Italic (default: Normal)
-;   marker_position         - Label position: Top, Bottom, Center, or N% (default: Top)
-;   marker_rotation_float   - Label rotation in degrees (default: 0)
+;   linestyle        - Line style (default: dashed)
+;   linewidth_float  - Line width; 0 = invisible line (default: 1)
+;   color            - Line and label color (default: red)
+;   fontsize_float   - Font size for marker labels (default: 7)
+;   fontstyle        - Font style: Normal, Bold, Italic, Bold Italic (default: Normal)
+;   position         - Label position: Top, Bottom, Center, or N% (default: Top)
+;   rotation_float   - Label rotation in degrees (default: 0)
 ; ==============================================================================
 
 [ANNOTATIONS.MARKER_DEFAULTS]
-marker_linestyle=dashed
-marker_linewidth_float=1
-marker_color=red
-marker_fontsize_float=7
-marker_fontstyle=normal
-marker_position=top
-marker_rotation_float=0
+linestyle=dashed
+linewidth_float=1
+color=red
+fontsize_float=7
+fontstyle=normal
+position=top
+rotation_float=0
 
 ; ==============================================================================
 ; ANNOTATIONS.MARKERS Section for pttplot.ini
@@ -187,7 +187,7 @@ marker_rotation_float=0
 ;   label, time, linestyle, linewidth, color, fontsize, fontstyle, position, rotation
 ;
 ; All 9 fields are required. Fields after time may be left blank (empty between
-; commas) or set to the marker_* default key name to use the section-level default.
+; commas) or set to the default key name to use the section-level default.
 ;
 ;   label     - Display text for the marker (spaces allowed)
 ;   time      - Numeric time value for the vertical line position
@@ -405,13 +405,13 @@ CONFIG_EXTERNAL_PROGRAMS_SVG_VIEWER_EXE  = 'svg_viewer_exe'
 CONFIG_PROCESS_ATTRIBUTES_OPTIONS        = 'PROCESS_ATTRIBUTES'
 CONFIG_PROCESS_ATTRIBUTES_COLOR          = 'color'
 CONFIG_PROCESS_ATTRIBUTES_KNOWN          = {CONFIG_PROCESS_ATTRIBUTES_COLOR}  # expand as new attrs arrive
-CONFIG_ANNOTATIONS_MARKERS_LINESTYLE     = 'marker_linestyle'
-CONFIG_ANNOTATIONS_MARKERS_LINEWIDTH     = 'marker_linewidth_float'
-CONFIG_ANNOTATIONS_MARKERS_COLOR         = 'marker_color'
-CONFIG_ANNOTATIONS_MARKERS_FONTSIZE      = 'marker_fontsize_float'
-CONFIG_ANNOTATIONS_MARKERS_FONTSTYLE     = 'marker_fontstyle'
-CONFIG_ANNOTATIONS_MARKERS_POSITION      = 'marker_position'
-CONFIG_ANNOTATIONS_MARKERS_ROTATION      = 'marker_rotation_float'
+CONFIG_ANNOTATIONS_MARKERS_LINESTYLE     = 'linestyle'
+CONFIG_ANNOTATIONS_MARKERS_LINEWIDTH     = 'linewidth_float'
+CONFIG_ANNOTATIONS_MARKERS_COLOR         = 'color'
+CONFIG_ANNOTATIONS_MARKERS_FONTSIZE      = 'fontsize_float'
+CONFIG_ANNOTATIONS_MARKERS_FONTSTYLE     = 'fontstyle'
+CONFIG_ANNOTATIONS_MARKERS_POSITION      = 'position'
+CONFIG_ANNOTATIONS_MARKERS_ROTATION      = 'rotation_float'
 
 # ── Presentation choice lists ─────────────────────────────────────────────────
 CONFIG_PRESENTATION_HBAR_STACKING_Unstacked       = 'Unstacked'

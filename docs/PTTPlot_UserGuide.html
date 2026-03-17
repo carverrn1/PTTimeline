@@ -1139,10 +1139,10 @@ python pttplot.py path/to/file.pttd</code></pre>
 <span class="sc">; Use semicolons for comments -- # is NOT a comment character in this parser</span>
 
 [ANNOTATIONS.MARKERS]
-<span class="sk">marker_linestyle</span> = <span class="sv">dashed</span>
-<span class="sk">marker_color</span>     = <span class="sv">#2c5282</span>    <span class="sc">; hex colors work correctly -- # is not a comment</span>
-<span class="sk">marker_fontsize</span>  = <span class="sv">9</span>
-<span class="sk">marker_position</span>  = <span class="sv">25%</span>         <span class="sc">; % is preserved literally by RawConfigParser</span>
+<span class="sk">linestyle</span> = <span class="sv">dashed</span>
+<span class="sk">color</span>     = <span class="sv">#2c5282</span>    <span class="sc">; hex colors work correctly -- # is not a comment</span>
+<span class="sk">fontsize</span>  = <span class="sv">9</span>
+<span class="sk">position</span>  = <span class="sv">25%</span>         <span class="sc">; % is preserved literally by RawConfigParser</span>
 
 <span class="sk">marker1</span> = <span class="sv">Project Start, 0,  solid,  1.5, #276749, 10, italic, Top, 90</span>
 <span class="sk">marker2</span> = <span class="sv">Milestone A,  30, dashed, 1,   #c05621, 9,  normal, 25%, 0</span></code></pre>
@@ -1159,9 +1159,7 @@ python pttplot.py path/to/file.pttd</code></pre>
     <h4>Marker Key Naming</h4>
     <p>
       Each marker key must start with <code>marker</code> followed immediately by a digit
-      (e.g., <code>marker1</code>, <code>marker2</code>, <code>marker10</code>). Keys using
-      the <code>marker_</code> prefix (with an underscore) are section-level defaults, not
-      individual markers, and are treated differently.
+      (e.g., <code>marker1</code>, <code>marker2</code>, <code>marker10</code>).
     </p>
 
     <h4>Marker Definition Format</h4>
@@ -1243,22 +1241,22 @@ python pttplot.py path/to/file.pttd</code></pre>
 
     <div class="note">
       <strong>Blank fields:</strong> Any field left blank (two consecutive commas) inherits its
-      value from the section-level <code>marker_*</code> default for that field.
+      value from the section-level default for that field.
     </div>
 
     <h4>Section-Level Defaults</h4>
     <p>
-      Set defaults that apply to all markers in the section using <code>marker_*</code> prefix keys.
+      Set defaults that apply to all markers in the section-level defaults.
       Individual marker fields that are left blank will inherit these defaults:
     </p>
     <pre><code>[ANNOTATIONS.MARKERS]
-<span class="sk">marker_linestyle</span> = <span class="sv">dashed</span>
-<span class="sk">marker_linewidth</span> = <span class="sv">1</span>
-<span class="sk">marker_color</span>     = <span class="sv">#555555</span>
-<span class="sk">marker_fontsize</span>  = <span class="sv">9</span>
-<span class="sk">marker_fontstyle</span> = <span class="sv">normal</span>
-<span class="sk">marker_position</span>  = <span class="sv">Top</span>
-<span class="sk">marker_rotation</span>  = <span class="sv">90</span>
+<span class="sk">linestyle</span> = <span class="sv">dashed</span>
+<span class="sk">linewidth</span> = <span class="sv">1</span>
+<span class="sk">color</span>     = <span class="sv">#555555</span>
+<span class="sk">fontsize</span>  = <span class="sv">9</span>
+<span class="sk">fontstyle</span> = <span class="sv">normal</span>
+<span class="sk">position</span>  = <span class="sv">Top</span>
+<span class="sk">rotation</span>  = <span class="sv">90</span>
 
 <span class="sc">; marker2 overrides only color and position; all other fields use section defaults:</span>
 <span class="sk">marker2</span> = <span class="sv">Milestone B, 45, , , #c05621, , , 25%,</span></code></pre>

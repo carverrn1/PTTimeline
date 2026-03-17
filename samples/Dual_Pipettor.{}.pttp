@@ -38,13 +38,13 @@ color_list = #1f77b4,
 	#9edae5
 
 [ANNOTATIONS.MARKER_DEFAULTS]
-marker_linestyle = dashed
-marker_linewidth_float = 1.0
-marker_color = red
-marker_fontsize_float = 7.0
-marker_fontstyle = Normal
-marker_position = top
-marker_rotation_float = 0.0
+linestyle = dashed
+linewidth_float = 1.0
+color = red
+fontsize_float = 7.0
+fontstyle = Normal
+position = top
+rotation_float = 0.0
 
 [ANNOTATIONS.MARKERS]
 marker0 = ←0.0 (NOTE: This demo Marker is defined in pttplot.ini. Remove 'marker0' in pttplot.ini OR define 'marker0=' in this plot's INI),0.0,dotted,6,red,10,italic,top,90
