@@ -1141,7 +1141,7 @@ python pttplot.py path/to/file.pttd</code></pre>
 [ANNOTATIONS.MARKER_DEFAULTS]
 <span class="sk">linestyle</span> = <span class="sv">dashed</span>
 <span class="sk">color</span>     = <span class="sv">#2c5282</span>    <span class="sc">; hex colors work correctly -- # is not a comment</span>
-<span class="sk">fontsize</span>  = <span class="sv">9</span>
+<span class="sk">fontsize_float</span>  = <span class="sv">9</span>
 <span class="sk">position</span>  = <span class="sv">25%</span>         <span class="sc">; % is preserved literally by RawConfigParser</span>
 
 [ANNOTATIONS.MARKERS]
@@ -1166,7 +1166,7 @@ python pttplot.py path/to/file.pttd</code></pre>
     <h4>Marker Definition Format</h4>
     <p>Each marker is one INI line with 9 comma-separated fields:</p>
 
-    <pre><code>marker<span class="ss">N</span> = <span class="sv">label, time, linestyle, linewidth, color, fontsize, fontstyle, position, rotation</span></code></pre>
+    <pre><code>marker<span class="ss">N</span> = <span class="sv">label, time_float, linestyle, linewidth_float, color, fontsize_float, fontstyle, position, rotation_float</span></code></pre>
 
     <div class="table-wrap">
       <table>
@@ -1186,7 +1186,7 @@ python pttplot.py path/to/file.pttd</code></pre>
             <td><code>Project Start</code>, <code>Go-Live</code>, or empty</td>
           </tr>
           <tr>
-            <td><strong>time</strong></td>
+            <td><strong>time_float</strong></td>
             <td>number</td>
             <td>Horizontal position of the marker, in the same time units as the chart data.</td>
             <td><code>0</code>, <code>30</code>, <code>-5</code>, <code>14.5</code></td>
@@ -1198,7 +1198,7 @@ python pttplot.py path/to/file.pttd</code></pre>
             <td><code>solid</code>, <code>dashed</code>, <code>dotted</code>, <code>dashdot</code>, <code>None</code></td>
           </tr>
           <tr>
-            <td><strong>linewidth</strong></td>
+            <td><strong>linewidth_float</strong></td>
             <td>number</td>
             <td>Width of the vertical line in points. Use <code>0</code> to hide the line while keeping the label visible.</td>
             <td><code>1</code>, <code>1.5</code>, <code>0</code></td>
@@ -1210,7 +1210,7 @@ python pttplot.py path/to/file.pttd</code></pre>
             <td><code>#2c5282</code>, <code>red</code>, <code>tab:blue</code></td>
           </tr>
           <tr>
-            <td><strong>fontsize</strong></td>
+            <td><strong>fontsize_float</strong></td>
             <td>number</td>
             <td>Font size of the label text in points.</td>
             <td><code>9</code>, <code>10</code>, <code>11</code></td>
@@ -1228,7 +1228,7 @@ python pttplot.py path/to/file.pttd</code></pre>
             <td><code>Top</code>, <code>Bottom</code>, <code>Center</code>, <code>25%</code> (percent from bottom)</td>
           </tr>
           <tr>
-            <td><strong>rotation</strong></td>
+            <td><strong>rotation_float</strong></td>
             <td>number</td>
             <td>
               Label text rotation angle. <code>0</code> = vertical, reading bottom-to-top.
@@ -1252,12 +1252,12 @@ python pttplot.py path/to/file.pttd</code></pre>
     </p>
     <pre><code>[ANNOTATIONS.MARKER_DEFAULTS]
 <span class="sk">linestyle</span> = <span class="sv">dashed</span>
-<span class="sk">linewidth</span> = <span class="sv">1</span>
+<span class="sk">linewidth_float</span> = <span class="sv">1</span>
 <span class="sk">color</span>     = <span class="sv">#555555</span>
-<span class="sk">fontsize</span>  = <span class="sv">9</span>
+<span class="sk">fontsize_float</span>  = <span class="sv">9</span>
 <span class="sk">fontstyle</span> = <span class="sv">normal</span>
 <span class="sk">position</span>  = <span class="sv">Top</span>
-<span class="sk">rotation</span>  = <span class="sv">90</span>
+<span class="sk">rotation_float</span>  = <span class="sv">90</span>
 
 [ANNOTATIONS.MARKERS]
 <span class="sc">; marker2 overrides only color and position; all other fields use section defaults:</span>
