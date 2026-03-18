@@ -1138,12 +1138,13 @@ python pttplot.py path/to/file.pttd</code></pre>
     <pre><code><span class="sc">; pttplot.ini example</span>
 <span class="sc">; Use semicolons for comments -- # is NOT a comment character in this parser</span>
 
-[ANNOTATIONS.MARKERS]
+[ANNOTATIONS.MARKER_DEFAULTS]
 <span class="sk">linestyle</span> = <span class="sv">dashed</span>
 <span class="sk">color</span>     = <span class="sv">#2c5282</span>    <span class="sc">; hex colors work correctly -- # is not a comment</span>
 <span class="sk">fontsize</span>  = <span class="sv">9</span>
 <span class="sk">position</span>  = <span class="sv">25%</span>         <span class="sc">; % is preserved literally by RawConfigParser</span>
 
+[ANNOTATIONS.MARKERS]
 <span class="sk">marker1</span> = <span class="sv">Project Start, 0,  solid,  1.5, #276749, 10, italic, Top, 90</span>
 <span class="sk">marker2</span> = <span class="sv">Milestone A,  30, dashed, 1,   #c05621, 9,  normal, 25%, 0</span></code></pre>
 
@@ -1249,7 +1250,7 @@ python pttplot.py path/to/file.pttd</code></pre>
       Set defaults that apply to all markers in the section-level defaults.
       Individual marker fields that are left blank will inherit these defaults:
     </p>
-    <pre><code>[ANNOTATIONS.MARKERS]
+    <pre><code>[ANNOTATIONS.MARKER_DEFAULTS]
 <span class="sk">linestyle</span> = <span class="sv">dashed</span>
 <span class="sk">linewidth</span> = <span class="sv">1</span>
 <span class="sk">color</span>     = <span class="sv">#555555</span>
@@ -1258,6 +1259,7 @@ python pttplot.py path/to/file.pttd</code></pre>
 <span class="sk">position</span>  = <span class="sv">Top</span>
 <span class="sk">rotation</span>  = <span class="sv">90</span>
 
+[ANNOTATIONS.MARKERS]
 <span class="sc">; marker2 overrides only color and position; all other fields use section defaults:</span>
 <span class="sk">marker2</span> = <span class="sv">Milestone B, 45, , , #c05621, , , 25%,</span></code></pre>
 
