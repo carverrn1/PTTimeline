@@ -58,3 +58,6 @@ copy build_install.bat "%target_folder%"
 copy *.VersionInfo "%target_folder%"
 copy PTTimeline.iss "%target_folder%"
 copy license.txt "%target_folder%"
+
+:: Cleanup unwanted files
+del "%target_folder%"\*.bak
