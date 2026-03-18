@@ -1145,8 +1145,8 @@ python pttplot.py path/to/file.pttd</code></pre>
 <span class="sk">position</span>  = <span class="sv">25%</span>         <span class="sc">; % is preserved literally by RawConfigParser</span>
 
 [ANNOTATIONS.MARKERS]
-<span class="sk">marker1</span> = <span class="sv">Project Start, 0,  solid,  1.5, #276749, 10, italic, Top, 90</span>
-<span class="sk">marker2</span> = <span class="sv">Milestone A,  30, dashed, 1,   #c05621, 9,  normal, 25%, 0</span></code></pre>
+<span class="sk">marker1</span> = <span class="sv">label=Project Start; time_float=0; linestyle=solid; linewidth_float=1.5;<br> color=#276749; fontsize_float=10; fontstyle=italic; position=Top; rotation_float=90</span>
+<span class="sk">marker2</span> = <span class="sv">label=Milestone A; time_float=30; linestyle=dashed; linewidth_float=1;<br> color=#c05621; fontsize_float=9; fontstyle=normal; position=25%; rotation_float=0</span></code></pre>
 
     <h3>Annotation Markers</h3>
     <p>
@@ -1261,7 +1261,7 @@ python pttplot.py path/to/file.pttd</code></pre>
 
 [ANNOTATIONS.MARKERS]
 <span class="sc">; marker2 overrides only color and position; all other fields use section defaults:</span>
-<span class="sk">marker2</span> = <span class="sv">Milestone B, 45, , , #c05621, , , 25%,</span></code></pre>
+<span class="sk">marker2</span> = <span class="sv">label=Milestone B; time_float=45; color=#c05621; position=25%</span></code></pre>
 
     <h4>Removing a Global Marker in a Per-File Presentation</h4>
     <p>

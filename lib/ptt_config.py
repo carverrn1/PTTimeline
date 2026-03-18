@@ -273,9 +273,17 @@ def _parse_marker_position(position_str):
 def _load_markers_from_ini(ini_cfg, config):
     """
     Parse marker definitions from [ANNOTATIONS.MARKERS] in ini_cfg and
-    update config in place.  Numeric keys use suffixes:
-      linewidth_float, fontsize_float, rotation_float
-    String keys (linestyle, color, fontstyle, position) have no suffix.
+    update config in place.
+
+    Marker format: semicolon-separated named parameters.
+    Only label= and time_float= are required; all other parameters are
+    optional and inherit from [ANNOTATIONS.MARKER_DEFAULTS] if omitted.
+
+      markerN = label=Text; time_float=0.0; linestyle=dashed; linewidth_float=1;
+                color=red; fontsize_float=7; fontstyle=Normal; position=Top; rotation_float=0
+
+    An empty value (markerN =) removes any existing marker with that key.
+    Unknown parameter names emit a warning and are ignored.
     Returns updated config.
     """
     from matplotlib.colors import is_color_like
@@ -289,6 +297,11 @@ def _load_markers_from_ini(ini_cfg, config):
         'dashdot': 'dashdot','-.':  'dashdot',
         'dotted':  'dotted', ':':   'dotted',
         'none':    'None',
+    }
+
+    VALID_PARAM_NAMES = {
+        'label', 'time_float', 'linestyle', 'linewidth_float',
+        'color', 'fontsize_float', 'fontstyle', 'position', 'rotation_float'
     }
 
     def _get(key, fallback):
@@ -314,10 +327,6 @@ def _load_markers_from_ini(ini_cfg, config):
         fontstyle_str = 'Normal'
     config[DEFAULTS_SECTION]['fontstyle'] = fontstyle_str
 
-    # Helper: field is blank or equals the default key name
-    def _is_default(field_val, default_key_name):
-        return not field_val or field_val.lower() == default_key_name.lower()
-
     # Start with existing markers so per-file INI can merge over pttplot.ini markers
     markers = list(config[SECTION].get('_markers', []))
 
@@ -337,88 +346,100 @@ def _load_markers_from_ini(ini_cfg, config):
             continue
 
         try:
-            parts = [p.strip() for p in value.split(',')]
-            if len(parts) != 9:
-                print(f"WARNING: Marker '{key}' has {len(parts)} fields "
-                      f"(expected 9). Skipping.")
-                continue
+            # Parse semicolon-separated named parameters
+            params = {}
+            for token in value.split(';'):
+                token = token.strip()
+                if not token:
+                    continue
+                if '=' not in token:
+                    print(f"WARNING: Marker '{key}' has token without '=': '{token}'. Ignoring.")
+                    continue
+                param_name, _, param_val = token.partition('=')
+                param_name = param_name.strip().lower()
+                param_val  = param_val.strip()
+                if param_name not in VALID_PARAM_NAMES:
+                    print(f"WARNING: Marker '{key}' has unknown parameter '{param_name}'. Ignoring.")
+                    continue
+                params[param_name] = param_val
 
-            # Field 0: label (required)
-            marker_name = parts[0]
+            # label= and time_float= are required
+            marker_name = params.get('label', '').strip()
             if not marker_name:
-                print(f"WARNING: Marker '{key}' has empty label. Skipping.")
+                print(f"WARNING: Marker '{key}' missing required label=. Skipping.")
                 continue
 
-            # Field 1: time (required)
-            time_val = float(parts[1])
+            time_raw = params.get('time_float', '')
+            if not time_raw:
+                print(f"WARNING: Marker '{key}' missing required time_float=. Skipping.")
+                continue
+            try:
+                time_val = float(time_raw)
+            except ValueError:
+                print(f"WARNING: Marker '{key}' invalid time_float='{time_raw}'. Skipping.")
+                continue
 
-            # Field 2: linestyle
-            ls_raw = parts[2]
-            if _is_default(ls_raw, 'linestyle'):
-                ls_raw = config[DEFAULTS_SECTION]['linestyle']
+            # linestyle — default if absent
+            ls_raw = params.get('linestyle', config[DEFAULTS_SECTION]['linestyle'])
             linestyle = VALID_LINESTYLES.get(ls_raw.lower())
             if linestyle is None:
-                print(f"WARNING: Marker '{marker_name}' invalid linestyle '{parts[2]}'. Skipping.")
+                print(f"WARNING: Marker '{marker_name}' invalid linestyle='{ls_raw}'. Skipping.")
                 continue
 
-            # Field 3: linewidth
-            lw_raw = parts[3]
-            if _is_default(lw_raw, 'linewidth_float'):
+            # linewidth_float — default if absent
+            lw_raw = params.get('linewidth_float', '')
+            if not lw_raw:
                 marker_linewidth = config[DEFAULTS_SECTION]['linewidth_float']
             else:
                 try:
                     marker_linewidth = float(lw_raw)
                 except ValueError:
-                    print(f"WARNING: Marker '{marker_name}' invalid linewidth '{lw_raw}'. Skipping.")
+                    print(f"WARNING: Marker '{marker_name}' invalid linewidth_float='{lw_raw}'. Skipping.")
                     continue
 
-            # Field 4: color
-            color = parts[4]
-            if _is_default(color, 'color'):
-                color = config[DEFAULTS_SECTION]['color']
+            # color — default if absent
+            color = params.get('color', config[DEFAULTS_SECTION]['color'])
             if not is_color_like(color):
-                print(f"WARNING: Marker '{marker_name}' invalid color '{color}'. Skipping.")
+                print(f"WARNING: Marker '{marker_name}' invalid color='{color}'. Skipping.")
                 continue
 
-            # Field 5: fontsize
-            fs_raw = parts[5]
-            if _is_default(fs_raw, 'fontsize_float'):
+            # fontsize_float — default if absent
+            fs_raw = params.get('fontsize_float', '')
+            if not fs_raw:
                 marker_fontsize = config[DEFAULTS_SECTION]['fontsize_float']
             else:
                 try:
                     marker_fontsize = float(fs_raw)
                 except ValueError:
-                    print(f"WARNING: Marker '{marker_name}' invalid fontsize '{fs_raw}'. Skipping.")
+                    print(f"WARNING: Marker '{marker_name}' invalid fontsize_float='{fs_raw}'. Skipping.")
                     continue
 
-            # Field 6: fontstyle
-            fst_raw = parts[6]
-            if _is_default(fst_raw, 'fontstyle'):
+            # fontstyle — default if absent
+            fst_raw = params.get('fontstyle', '')
+            if not fst_raw:
                 marker_fontstyle = config[DEFAULTS_SECTION]['fontstyle']
             else:
-                marker_fontstyle = fst_raw.title()
+                marker_fontstyle = fst_raw.strip().title()
                 if _parse_fontstyle(marker_fontstyle) is None:
-                    print(f"WARNING: Marker '{marker_name}' invalid fontstyle '{fst_raw}'. Skipping.")
+                    print(f"WARNING: Marker '{marker_name}' invalid fontstyle='{fst_raw}'. Skipping.")
                     continue
 
-            # Field 7: position
-            pos_raw = parts[7]
-            if _is_default(pos_raw, 'position'):
-                pos_raw = config[DEFAULTS_SECTION]['position']
+            # position — default if absent
+            pos_raw = params.get('position', config[DEFAULTS_SECTION]['position'])
             marker_position = _parse_marker_position(pos_raw)
             if marker_position is None:
-                print(f"WARNING: Marker '{marker_name}' invalid position '{parts[7]}'. Skipping.")
+                print(f"WARNING: Marker '{marker_name}' invalid position='{pos_raw}'. Skipping.")
                 continue
 
-            # Field 8: rotation
-            rot_raw = parts[8]
-            if _is_default(rot_raw, 'rotation_float'):
+            # rotation_float — default if absent
+            rot_raw = params.get('rotation_float', '')
+            if not rot_raw:
                 marker_rotation = config[DEFAULTS_SECTION]['rotation_float']
             else:
                 try:
                     marker_rotation = float(rot_raw)
                 except ValueError:
-                    print(f"WARNING: Marker '{marker_name}' invalid rotation '{rot_raw}'. Skipping.")
+                    print(f"WARNING: Marker '{marker_name}' invalid rotation_float='{rot_raw}'. Skipping.")
                     continue
 
             fontweight, fontstyle = _parse_fontstyle(marker_fontstyle)

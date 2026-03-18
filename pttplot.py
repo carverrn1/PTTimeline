@@ -183,36 +183,34 @@ rotation_float=0
 ; Default attribute values are in [ANNOTATIONS.MARKER_DEFAULTS].
 ;
 ; Each marker is defined by a unique key starting with "marker" followed by a
-; digit (e.g. marker1, marker2). The value is a comma-separated list of 9 fields:
-;   label, time, linestyle, linewidth, color, fontsize, fontstyle, position, rotation
+; digit (e.g. marker1, marker2). The value is a semicolon-separated list of
+; named parameters. Only label= and time_float= are required; all others are
+; optional and inherit from [ANNOTATIONS.MARKER_DEFAULTS] if omitted.
 ;
-; All 9 fields are required. Fields after time may be left blank (empty between
-; commas) or set to the default key name to use the section-level default.
-;
-;   label     - Display text for the marker (spaces allowed)
-;   time      - Numeric time value for the vertical line position
-;   linestyle - Matplotlib line style: none, solid, dashed, dashdot, dotted
-;               (or shorthand: -, --, -., :)
-;   linewidth - Line width in points (0 = invisible line, label only)
-;   color     - Matplotlib color: hex code (#ff0000) or named color (red)
-;   fontsize  - Font size for the label
-;   fontstyle - Normal, Bold, Italic, Bold Italic
-;   position  - Where label text is placed along the marker line:
-;               Top, Bottom, Center, or a percentage (e.g. 25%)
-;               where the % is measured from the bottom of the plot.
-;   rotation  - Label text rotation in degrees.
-;               0 = vertical (reads bottom to top along Y-axis)
-;               90 = horizontal (reads left to right along X-axis)
+;   label=           - Display text for the marker (spaces allowed)
+;   time_float=      - Numeric time value for the vertical line position
+;   linestyle=       - Matplotlib line style: none, solid, dashed, dashdot, dotted
+;                      (or shorthand: -, --, -., :)
+;   linewidth_float= - Line width in points (0 = invisible line, label only)
+;   color=           - Matplotlib color: hex code (#ff0000) or named color (red)
+;   fontsize_float=  - Font size for the label
+;   fontstyle=       - Normal, Bold, Italic, Bold Italic
+;   position=        - Where label text is placed along the marker line:
+;                      Top, Bottom, Center, or a percentage (e.g. 25%)
+;                      where the % is measured from the bottom of the plot.
+;   rotation_float=  - Label text rotation in degrees.
+;                      0 = vertical (reads bottom to top along Y-axis)
+;                      90 = horizontal (reads left to right along X-axis)
 ;
 ; Example:
-;   marker1 = Deadline, 5.0, dashed, 1, red, 7, Bold, Top, 0
-;   marker2 = Milestone, 10.0, dotted, , #00aa00, , Italic, 25%, 90
-;   marker3 = Label Only, 8.0, solid, 0, blue, 10, , Center,
+;   marker1 = label=Deadline; time_float=5.0; linestyle=dashed; color=red
+;   marker2 = label=Milestone; time_float=10.0; linestyle=dotted; color=#00aa00; fontstyle=Italic; position=25%
+;   marker3 = label=Label Only; time_float=8.0; linewidth_float=0; color=blue; position=Center; rotation_float=90
 ; ==============================================================================
 
 [ANNOTATIONS.MARKERS]
 ; Demo markers
-marker0=←0.0 (NOTE: This demo Marker is defined in pttplot.ini. Remove 'marker0' in pttplot.ini OR define 'marker0=' in this plot's INI),0.0,dotted,6,red,10,italic,top,90
+marker0=label=←0.0 (NOTE: This demo Marker is defined in pttplot.ini. Remove 'marker0' in pttplot.ini OR define 'marker0=' in this plot's INI); time_float=0.0; linestyle=dotted; linewidth_float=6; color=red; fontsize_float=10; fontstyle=italic; position=top; rotation_float=90
 """
 
 
