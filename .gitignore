@@ -27,17 +27,19 @@ Installer/
 Claude_Project_Files/
 
 # -----------------------------------------------------------------------------
-# Notepad++ backup folders (appear in any subfolder)
+# Notepad++ session files and backup folders (appear in any subfolder)
 # -----------------------------------------------------------------------------
+*.npp_session
 **/nppBackup/
 
 # -----------------------------------------------------------------------------
-# Backup and temporary files
+# Backup and temporary files/folders
 # -----------------------------------------------------------------------------
 *.bak
 *.out
 *.log
 * - Copy*.*
+files/
 
 # -----------------------------------------------------------------------------
 # Archive files
@@ -71,5 +73,4 @@ $RECYCLE.BIN/
 # Miscellaneous
 # -----------------------------------------------------------------------------
 filelist.txt
-*.npp_session
 *.lnk
