@@ -683,6 +683,27 @@
             </td>
           </tr>
           <tr>
+            <td><strong>Export UML Timing Diagram</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Export the current timeline as a PlantUML timing diagram source file
+              (<code>.puml</code>). The output path is derived automatically from the
+              current <code>.pttd</code> filename (same directory and base name, with
+              a <code>.puml</code> extension). If a file with that name already exists,
+              a confirmation dialog is shown before overwriting. This item is disabled
+              until a file has been loaded or saved.
+              <div class="note" style="margin-top:0.6rem;">
+                <strong>Note:</strong> PTTEdit generates only the <code>.puml</code>
+                source file. Rendering the diagram image requires
+                <a href="https://plantuml.com" target="_blank" rel="noopener">PlantUML</a>
+                (<code>plantuml.jar</code>) and a
+                <a href="https://adoptium.net" target="_blank" rel="noopener">Java Runtime Environment (JRE)</a>
+                to be installed separately on your system. Once installed, open the
+                <code>.puml</code> file with PlantUML to generate the PNG diagram.
+              </div>
+            </td>
+          </tr>
+          <tr>
             <td><strong>Exit</strong></td>
             <td>&mdash;</td>
             <td>
@@ -961,9 +982,9 @@
             <td><code>EndTime(Process1:Task2)</code></td>
           </tr>
           <tr>
-            <td><code>Duration($:$)</code></td>
+            <td><code>StartTime($:$)</code></td>
             <td>Process1 : Task2</td>
-            <td><code>Duration(Process1:Task2)</code></td>
+            <td><code>StartTime(Process1:Task2)</code></td>
           </tr>
         </tbody>
       </table>
