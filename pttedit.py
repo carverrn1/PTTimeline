@@ -654,6 +654,10 @@ class DataFrameEditor(QMainWindow):
         self.file_export_ods_action.triggered.connect(self.export_timeline_to_ods)
         self.file_export_ods_action.setEnabled(False)
         file_menu.addAction(self.file_export_ods_action)
+        self.file_export_puml_action = QAction("Export &UML Timing Diagram", self)
+        self.file_export_puml_action.triggered.connect(self.export_timeline_to_puml)
+        self.file_export_puml_action.setEnabled(False)
+        file_menu.addAction(self.file_export_puml_action)
         file_menu.addSeparator()
         file_exit_action = QAction("&Exit", self)
         file_exit_action.triggered.connect(self.exit_app)
@@ -997,6 +1001,7 @@ class DataFrameEditor(QMainWindow):
         self.workingFilename = None
         self.file_export_csv_action.setEnabled(False)
         self.file_export_ods_action.setEnabled(False)
+        self.file_export_puml_action.setEnabled(False)
         self.setWindowTitle(f"{PROGRAM_NAME} - *Demo*")
         self.dependency_graph = {}
         self.recalc_order = []
@@ -1051,6 +1056,7 @@ class DataFrameEditor(QMainWindow):
         self.workingFilename = None
         self.file_export_csv_action.setEnabled(False)
         self.file_export_ods_action.setEnabled(False)
+        self.file_export_puml_action.setEnabled(False)
         self.setWindowTitle(f"{PROGRAM_NAME} - *New*")
         self.dependency_graph = {}
         self.recalc_order = []
@@ -1130,6 +1136,7 @@ class DataFrameEditor(QMainWindow):
                 self.workingFilename = None     # CSV imports data only. None workingFilename forces "Save As" later.
                 self.file_export_csv_action.setEnabled(False)
                 self.file_export_ods_action.setEnabled(False)
+                self.file_export_puml_action.setEnabled(False)
                 self.dependency_graph = {}
                 self.recalc_order = []
                 self.dataframe = self._load_csv_to_dataframe(filename)
@@ -1254,6 +1261,7 @@ class DataFrameEditor(QMainWindow):
                 self.workingFilename = filename
                 self.file_export_csv_action.setEnabled(True)
                 self.file_export_ods_action.setEnabled(True)
+                self.file_export_puml_action.setEnabled(True)
                 self.dependency_graph = {}
                 self.recalc_order = []
                 with open(self.workingFilename, 'r') as json_file:
@@ -1310,6 +1318,7 @@ class DataFrameEditor(QMainWindow):
             self.workingFilename = filename
             self.file_export_csv_action.setEnabled(True)
             self.file_export_ods_action.setEnabled(True)
+            self.file_export_puml_action.setEnabled(True)
             self.dependency_graph = {}
             self.recalc_order = []
             update_splash(getattr(self, '_splash', None), getattr(self, '_splash_label', None), getattr(self, '_splash_img', None), 'Loading file...')
@@ -1637,6 +1646,205 @@ class DataFrameEditor(QMainWindow):
         self._write_ods(ods_path)
         debugging.leave()
 
+    def generate_puml_content(self):
+        """Generate PlantUML timing diagram content from the current dataframe.
+
+        Returns a string containing the full .puml file text.
+
+        Design notes:
+          - Each task becomes its own 'concise' lifeline: "ProcessName.TaskName"
+          - Two states per lifeline: active and idle
+          - Gaps between tasks within a process are filled with idle
+          - After the last task on a process the lifeline transitions to complete
+          - Tasks within the same process may overlap (PTTimeline allows this);
+            overlapping pairs are noted as comments in the output
+          - Rows with blank ProcessName or TaskName are silently skipped
+          - Times are read from the evaluated StartTime / EndTime columns
+        """
+        debugging.enter()
+
+        # ── Build working dataframe from model ──────────────────────────────
+        data = [[self.model.item(row, col).text()
+                 for col in range(self.model.columnCount())]
+                for row in range(self.model.rowCount())]
+        df = pd.DataFrame(data, columns=COLUMN_NAMES)
+
+        # Keep only rows with non-blank process and task names
+        df = df[(df[PROCESS_NAME_HDR].str.strip() != '') &
+                (df[TASK_NAME_HDR].str.strip()    != '')].copy()
+
+        # Convert time columns to float; rows that fail become NaN and are dropped
+        df[START_TIME_HDR] = pd.to_numeric(df[START_TIME_HDR], errors='coerce')
+        df[END_TIME_HDR]   = pd.to_numeric(df[END_TIME_HDR],   errors='coerce')
+        df = df.dropna(subset=[START_TIME_HDR, END_TIME_HDR])
+
+        if df.empty:
+            debugging.leave('no valid rows')
+            return None     # caller will report error
+
+        # ── Lifeline alias: "ProcessName.TaskName" → safe alias ─────────────
+        # Build ordered list of (process, task) in first-appearance order
+        seen = {}
+        ordered_lifelines = []
+        for _, row in df.iterrows():
+            pt = (row[PROCESS_NAME_HDR], row[TASK_NAME_HDR])
+            if pt not in seen:
+                seen[pt] = True
+                ordered_lifelines.append(pt)
+
+        def alias(process, task):
+            # Collapse to alphanumeric + underscore for PlantUML identifier
+            raw = f"{process}_{task}"
+            return re.sub(r'[^A-Za-z0-9_]', '_', raw)
+
+        def label(process, task):
+            return f"{process}.{task}"
+
+        # ── Detect intra-process overlaps ────────────────────────────────────
+        overlap_comments = []
+        process_groups = df.groupby(PROCESS_NAME_HDR, sort=False)
+        for proc, grp in process_groups:
+            tasks = grp.sort_values(START_TIME_HDR).reset_index(drop=True)
+            for i in range(len(tasks)):
+                for j in range(i + 1, len(tasks)):
+                    a = tasks.iloc[i]
+                    b = tasks.iloc[j]
+                    # b starts before a ends → overlap
+                    if b[START_TIME_HDR] < a[END_TIME_HDR]:
+                        overlap_comments.append(
+                            f"' WARNING: overlap in process '{proc}': "
+                            f"'{a[TASK_NAME_HDR]}' ({a[START_TIME_HDR]}–{a[END_TIME_HDR]}) "
+                            f"overlaps '{b[TASK_NAME_HDR]}' ({b[START_TIME_HDR]}–{b[END_TIME_HDR]})"
+                        )
+                    else:
+                        break   # tasks are sorted; no further j can overlap i
+
+        # ── Collect all unique time points in ascending order ─────────────────
+        time_points = sorted(set(
+            df[START_TIME_HDR].tolist() + df[END_TIME_HDR].tolist()
+        ))
+
+        # ── Build per-lifeline state at each time point ───────────────────────
+        # state_map[time][alias] = 'active' | 'idle' | 'complete' | None
+        # We only emit a state when it changes from the previous time point.
+
+        # For each lifeline track: last_state, last_task_end
+        lifeline_info = {}
+        for proc, task in ordered_lifelines:
+            al = alias(proc, task)
+            task_rows = df[(df[PROCESS_NAME_HDR] == proc) &
+                           (df[TASK_NAME_HDR]    == task)].sort_values(START_TIME_HDR)
+            lifeline_info[al] = {
+                'process':  proc,
+                'task':     task,
+                'intervals': list(zip(task_rows[START_TIME_HDR], task_rows[END_TIME_HDR])),
+                'last_end':  task_rows[END_TIME_HDR].max(),
+            }
+
+        def state_at(al, t):
+            """Return 'active' if t falls within any interval, else None."""
+            for (s, e) in lifeline_info[al]['intervals']:
+                if s <= t < e:
+                    return 'active'
+            return None
+
+        # ── Build the .puml text ─────────────────────────────────────────────
+        lines = ['@startuml']
+
+        # Lifeline declarations
+        for proc, task in ordered_lifelines:
+            al = alias(proc, task)
+            lines.append(f'concise "{label(proc, task)}" as {al}')
+
+        # Overlap warnings
+        if overlap_comments:
+            lines.append('')
+            lines.extend(overlap_comments)
+
+        # Initial @0 block — all lifelines start idle
+        lines.append('')
+        lines.append('@0')
+        for proc, task in ordered_lifelines:
+            al = alias(proc, task)
+            lines.append(f'{al} is idle')
+
+        # Walk time points, emit state changes
+        current_state = {alias(p, t): 'idle' for p, t in ordered_lifelines}
+
+        for tp in time_points:
+            if tp == 0:
+                continue    # already emitted in @0 block
+
+            block_lines = []
+            for proc, task in ordered_lifelines:
+                al = alias(proc, task)
+                info = lifeline_info[al]
+
+                # Determine new state at this time point
+                active = state_at(al, tp)
+                if active == 'active':
+                    new_state = 'active'
+                elif tp >= info['last_end']:
+                    new_state = 'complete'
+                else:
+                    new_state = 'idle'
+
+                if new_state != current_state[al]:
+                    block_lines.append(f'{al} is {new_state}')
+                    current_state[al] = new_state
+
+            if block_lines:
+                # Format time: strip trailing zeros after decimal for cleanliness
+                tp_str = f'{tp:g}'
+                lines.append('')
+                lines.append(f'@{tp_str}')
+                lines.extend(block_lines)
+
+        lines.append('')
+        lines.append('@enduml')
+        lines.append('')    # trailing newline
+
+        debugging.leave()
+        return '\n'.join(lines)
+
+    def _write_puml(self, puml_path):
+        """Worker: generate and write the .puml file to puml_path."""
+        debugging.enter(f"puml_path={puml_path}")
+        try:
+            content = self.generate_puml_content()
+            if content is None:
+                QMessageBox.warning(self, 'Export UML Timing Diagram',
+                    'Nothing to export — no rows with valid process names, '
+                    'task names, and evaluated times.')
+                debugging.leave('no content')
+                return
+            with open(puml_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            QMessageBox.information(self, 'Export UML Timing Diagram',
+                f'Exported successfully:\n{puml_path}')
+        except Exception as e:
+            debugging.print(f'ERROR: Export PUML: {puml_path}, e={e}')
+            QMessageBox.critical(self, 'Error Exporting UML Timing Diagram',
+                f'File: {puml_path}\nException: {e}')
+        debugging.leave()
+
+    def export_timeline_to_puml(self):
+        """Called by File->Export UML Timing Diagram. Derives the output path
+        from workingFilename, prompts before overwriting, then delegates to
+        _write_puml()."""
+        debugging.enter()
+        puml_path = str(Path(self.workingFilename).with_suffix('.puml'))
+        if Path(puml_path).exists():
+            result = QMessageBox.question(self, 'Export UML Timing Diagram',
+                f'File already exists:\n{puml_path}\n\nOverwrite?',
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if result != QMessageBox.StandardButton.Yes:
+                debugging.leave('Cancelled by user')
+                return
+        self._write_puml(puml_path)
+        debugging.leave()
+
 
     def save_timeline_to_pttd(self, filename):
         global config
@@ -1718,6 +1926,8 @@ class DataFrameEditor(QMainWindow):
             try:
                 self.workingFilename = filename
                 self.file_export_csv_action.setEnabled(True)
+                self.file_export_ods_action.setEnabled(True)
+                self.file_export_puml_action.setEnabled(True)
                 self.save_timeline_to_pttd(filename)
                 # set_file_modified(False) is called inside save_timeline_to_pttd,
                 # which also sets the window title correctly — no manual fixup needed here
