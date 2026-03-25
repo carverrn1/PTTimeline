@@ -81,7 +81,7 @@
             Duration: "0.000",
         },
         "7": {
-            ProcessName: "LOCKSTEPS",
+            ProcessName: "",
             TaskName: "_LS1",
             StartTimeFormula: "0",
             StartTime: "0.000",
@@ -90,7 +90,7 @@
             Duration: "24.000",
         },
         "8": {
-            ProcessName: "LOCKSTEPS",
+            ProcessName: "",
             TaskName: "_LS2",
             StartTimeFormula: "End($:_LS1)",
             StartTime: "24.000",
@@ -99,7 +99,7 @@
             Duration: "24.000",
         },
         "9": {
-            ProcessName: "LOCKSTEPS",
+            ProcessName: "",
             TaskName: "_LS3",
             StartTimeFormula: "End($:_LS2)",
             StartTime: "48.000",
@@ -108,7 +108,7 @@
             Duration: "24.000",
         },
         "10": {
-            ProcessName: "LOCKSTEPS",
+            ProcessName: "",
             TaskName: "_LS4",
             StartTimeFormula: "End($:_LS3)",
             StartTime: "72.000",
@@ -117,7 +117,7 @@
             Duration: "24.000",
         },
         "11": {
-            ProcessName: "LOCKSTEPS",
+            ProcessName: "",
             TaskName: "_LS5",
             StartTimeFormula: "End($:_LS4)",
             StartTime: "96.000",
@@ -128,7 +128,7 @@
         "12": {
             ProcessName: "X_Axis",
             TaskName: "X_Move_To_Aspirate",
-            StartTimeFormula: "Start(LOCKSTEPS:_LS1)",
+            StartTimeFormula: "Start(:_LS1)",
             StartTime: "0.000",
             EndTimeFormula: "Start($:$)+Duration(:_XY_MOVE_TIME_)",
             EndTime: "2.000",
@@ -335,7 +335,7 @@
         "35": {
             ProcessName: "X_Axis",
             TaskName: "X_Move_To_Aspirate_LS2",
-            StartTimeFormula: "Start(LOCKSTEPS:_LS2)",
+            StartTimeFormula: "Start(:_LS2)",
             StartTime: "24.000",
             EndTimeFormula: "Start($:$)+Duration(:_XY_MOVE_TIME_)",
             EndTime: "26.000",
@@ -551,19 +551,19 @@
         "59": {
             ProcessName: "Process_Path",
             TaskName: "Advance_Track_LS1",
-            StartTimeFormula: "Start(LOCKSTEPS:_LS1)+Duration(:_LOCKSTEP_)-Duration(:PROCESS_PATH_ADVANCE_TIME)",
-            StartTime: "23.000",
+            StartTimeFormula: "Start(:_LS1)+Duration(:_LOCKSTEP_)-Duration(:PROCESS_PATH_ADVANCE_TIME)-1",
+            StartTime: "22.000",
             EndTimeFormula: "Start($:$)+Duration(:PROCESS_PATH_ADVANCE_TIME)",
-            EndTime: "24.000",
+            EndTime: "23.000",
             Duration: "1.000",
         },
         "60": {
             ProcessName: "Process_Path",
             TaskName: "Advance_Track_LS2",
             StartTimeFormula: "Start($:Advance_Track_LS1)+Duration(:_LOCKSTEP_)",
-            StartTime: "47.000",
+            StartTime: "46.000",
             EndTimeFormula: "Start($:$)+Duration(:PROCESS_PATH_ADVANCE_TIME)",
-            EndTime: "48.000",
+            EndTime: "47.000",
             Duration: "1.000",
         },
         "61": {

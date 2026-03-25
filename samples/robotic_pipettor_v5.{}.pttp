@@ -1,0 +1,82 @@
+[PLOTTING]
+window_maximized_bool = False
+title_text = Process-Task Timeline
+x_axis_label = Time
+y_axis_label = Processes
+set_major_locator_float = 1.0
+set_minor_locator_float = 0.1
+x_axis_min_float = -0.1
+x_axis_max_float = 48.1
+exclude_hbar_groups = ['']
+save_dpi_int = 300
+
+[PRESENTATION]
+hbar_stacking = Stacked
+hbar_label_justified = Center
+hbar_label_rotation = Horizontal
+dependency_arrow_mode = Time
+show_predecessors_bool = False
+show_successors_bool = True
+
+[COLORS]
+color_list = #1f77b4,
+	#aec7e8,
+	#ff7f0e,
+	#ffbb78,
+	#2ca02c,
+	#98df8a,
+	#d62728,
+	#ff9896,
+	#9467bd,
+	#c5b0d5,
+	#8c564b,
+	#c49c94,
+	#e377c2,
+	#f7b6d2,
+	#7f7f7f,
+	#c7c7c7,
+	#bcbd22,
+	#dbdb8d,
+	#17becf,
+	#9edae5
+
+[ANNOTATIONS.MARKER_DEFAULTS]
+linestyle = dashed
+linewidth_float = 1.0
+color = red
+fontsize_float = 7.0
+fontstyle = Normal
+position = top
+rotation_float = 0.0
+
+[ANNOTATIONS.MARKERS]
+; Demo markers
+;marker0=label=←0.0 (NOTE: This demo Marker); time=0.0; linestyle=dotted; linewidth_float=6; color=red; fontsize_float=10; fontstyle=italic; position=top; rotation_float=90
+marker01 = label=LS1; time=Start(:_LS1); color=blue; rotation_float=90; linewidth_float=1; fontstyle=bold
+marker02 = label=LS2; time=Start(:_LS2); color=blue; rotation_float=90; linewidth_float=1; fontstyle=bold
+marker03 = label=LS3; time=Start(:_LS3); color=blue; rotation_float=90; linewidth_float=1; fontstyle=bold
+marker04 = label=LS4; time=Start(:_LS4); color=blue; rotation_float=90; linewidth_float=1; fontstyle=bold
+marker11 = label=Path_Adv; time=Start(Process_Path:Advance_Track_LS1); color=purple; position=bottom; linestyle=dotted; linewidth_float=1; fontstyle=bold; rotation_float=10
+marker12 = label=X; time=End(Process_Path:Advance_Track_LS1); color=purple; position=bottom; linestyle=dotted; linewidth_float=1
+marker21 = label=Path_Adv; time=Start(Process_Path:Advance_Track_LS2); color=purple; position=bottom; linestyle=dotted; linewidth_float=1; fontstyle=bold; rotation_float=10
+marker22 = label=X; time=End(Process_Path:Advance_Track_LS2); color=purple; position=bottom; linestyle=dotted; linewidth_float=1
+
+; ==============================================================================
+; PROCESS_ATTRIBUTES Section
+; ==============================================================================
+; Per-process attribute overrides. Applies on top of [COLORS].color_list
+; palette assignment. ProcessName must match the PTTD exactly (case-sensitive).
+; Unknown process names and unknown attribute names are ignored (debug-logged).
+;
+; Format:  ProcessName = color=#rrggbb
+;
+[PROCESS_ATTRIBUTES]
+X_Axis = color=#ff5500
+Y_Axis = color=#ff7f0e
+XY_Gantry = color=#ffbb78
+Z1_Pipettor = color=#2ca02c
+Syringe_Z1 = color=#98df8a
+Z2_Pipettor = color=#d62728
+Syringe_Z2 = color=#ff9896
+Process_Path = color=#9467bd
+Reagent1 = color=#c5b0d5
