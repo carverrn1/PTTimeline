@@ -1,4 +1,5 @@
 import os
+import re
 import configparser
 import shutil
 from datetime import datetime
@@ -276,11 +277,21 @@ def _load_markers_from_ini(ini_cfg, config):
     update config in place.
 
     Marker format: semicolon-separated named parameters.
-    Only label= and time_float= are required; all other parameters are
+    Only label= and time= are required; all other parameters are
     optional and inherit from [ANNOTATIONS.MARKER_DEFAULTS] if omitted.
 
-      markerN = label=Text; time_float=0.0; linestyle=dashed; linewidth_float=1;
+      markerN = label=Text; time=0.0; linestyle=dashed; linewidth_float=1;
                 color=red; fontsize_float=7; fontstyle=Normal; position=Top; rotation_float=0
+
+    time= accepts either a numeric float or a task reference formula:
+      time=Start(ProcessName:TaskName)
+      time=End(ProcessName:TaskName)
+    Supported function names (must match exactly, same as PTTEdit):
+                               Start, START, StartTime, STARTTIME,
+                               End, END, EndTime, ENDTIME.
+    Formula references are resolved at plot time against task_plot_positions.
+    If the referenced task is not found in the plot data, the marker is skipped
+    with a debug warning.
 
     An empty value (markerN =) removes any existing marker with that key.
     Unknown parameter names emit a warning and are ignored.
@@ -300,9 +311,14 @@ def _load_markers_from_ini(ini_cfg, config):
     }
 
     VALID_PARAM_NAMES = {
-        'label', 'time_float', 'linestyle', 'linewidth_float',
+        'label', 'time', 'linestyle', 'linewidth_float',
         'color', 'fontsize_float', 'fontstyle', 'position', 'rotation_float'
     }
+
+    # Regex for task reference formulas — explicit variants match PTTEdit's registered functions exactly.
+    _TIME_REF_RE = re.compile(
+        r'^(StartTime|STARTTIME|Start|START|EndTime|ENDTIME|End|END)\s*\(\s*(.*?)\s*:\s*(.+?)\s*\)$'
+    )
 
     def _get(key, fallback):
         return ini_cfg.get(DEFAULTS_SECTION, key, fallback=fallback) if ini_cfg.has_section(DEFAULTS_SECTION) else fallback
@@ -363,21 +379,34 @@ def _load_markers_from_ini(ini_cfg, config):
                     continue
                 params[param_name] = param_val
 
-            # label= and time_float= are required
+            # label= and time= are required
             marker_name = params.get('label', '').strip()
             if not marker_name:
                 print(f"WARNING: Marker '{key}' missing required label=. Skipping.")
                 continue
 
-            time_raw = params.get('time_float', '')
+            time_raw = params.get('time', '')
             if not time_raw:
-                print(f"WARNING: Marker '{key}' missing required time_float=. Skipping.")
+                print(f"WARNING: Marker '{key}' missing required time=. Skipping.")
                 continue
+
+            # time= accepts a literal float or a task reference formula
+            time_val = None
+            time_ref = None
             try:
                 time_val = float(time_raw)
             except ValueError:
-                print(f"WARNING: Marker '{key}' invalid time_float='{time_raw}'. Skipping.")
-                continue
+                m = _TIME_REF_RE.match(time_raw)
+                if m:
+                    func_name  = m.group(1).lower()   # normalise: start/starttime/end/endtime
+                    ref_proc   = m.group(2).strip()
+                    ref_task   = m.group(3).strip()
+                    ref_edge   = 'start' if func_name.startswith('start') else 'end'
+                    time_ref   = (ref_edge, ref_proc, ref_task)
+                else:
+                    print(f"WARNING: Marker '{key}' invalid time='{time_raw}'. "
+                          f"Expected a float or Start/End(Process:Task). Skipping.")
+                    continue
 
             # linestyle — default if absent
             ls_raw = params.get('linestyle', config[DEFAULTS_SECTION]['linestyle'])
@@ -450,6 +479,7 @@ def _load_markers_from_ini(ini_cfg, config):
                 'key':        key,
                 'name':       marker_name,
                 'time':       time_val,
+                'time_ref':   time_ref,
                 'linestyle':  linestyle,
                 'linewidth':  marker_linewidth,
                 'color':      color,

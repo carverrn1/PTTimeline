@@ -184,11 +184,19 @@ rotation_float=0
 ;
 ; Each marker is defined by a unique key starting with "marker" followed by a
 ; digit (e.g. marker1, marker2). The value is a semicolon-separated list of
-; named parameters. Only label= and time_float= are required; all others are
+; named parameters. Only label= and time= are required; all others are
 ; optional and inherit from [ANNOTATIONS.MARKER_DEFAULTS] if omitted.
 ;
 ;   label=           - Display text for the marker (spaces allowed)
-;   time_float=      - Numeric time value for the vertical line position
+;   time=            - Time position for the vertical marker line.
+;                      Accepts a numeric float:
+;                        time=5.0
+;                      Or a task reference formula (resolved at plot time):
+;                        time=Start(ProcessName:TaskName)
+;                        time=End(ProcessName:TaskName)
+;                      Supported functions (must match exactly, same as PTTEdit):
+;                        Start, START, StartTime, STARTTIME,
+;                        End, END, EndTime, ENDTIME
 ;   linestyle=       - Matplotlib line style: none, solid, dashed, dashdot, dotted
 ;                      (or shorthand: -, --, -., :)
 ;   linewidth_float= - Line width in points (0 = invisible line, label only)
@@ -203,14 +211,14 @@ rotation_float=0
 ;                      90 = horizontal (reads left to right along X-axis)
 ;
 ; Example:
-;   marker1 = label=Deadline; time_float=5.0; linestyle=dashed; color=red
-;   marker2 = label=Milestone; time_float=10.0; linestyle=dotted; color=#00aa00; fontstyle=Italic; position=25%
-;   marker3 = label=Label Only; time_float=8.0; linewidth_float=0; color=blue; position=Center; rotation_float=90
+;   marker1 = label=Deadline; time=5.0; linestyle=dashed; color=red
+;   marker2 = label=Milestone; time=End(Process1:Task3); linestyle=dotted; color=#00aa00; fontstyle=Italic; position=25%
+;   marker3 = label=Label Only; time=Start(Process2:Task1); linewidth_float=0; color=blue; position=Center; rotation_float=90
 ; ==============================================================================
 
 [ANNOTATIONS.MARKERS]
 ; Demo markers
-marker0=label=←0.0 (NOTE: This demo Marker is defined in pttplot.ini. Remove 'marker0' in pttplot.ini OR define 'marker0=' in this plot's INI); time_float=0.0; linestyle=dotted; linewidth_float=6; color=red; fontsize_float=10; fontstyle=italic; position=top; rotation_float=90
+;marker0=label=←0.0 (NOTE: This demo Marker); time=0.0; linestyle=dotted; linewidth_float=6; color=red; fontsize_float=10; fontstyle=italic; position=top; rotation_float=90
 """
 
 
@@ -737,10 +745,33 @@ class TimelinePlotWidget(QWidget):
         markers = config[CONFIG_ANNOTATIONS_MARKERS_OPTIONS].get('_markers', [])
         plot_xlim = ax.get_xlim()
         for marker in markers:
-            if marker['time'] < plot_xlim[0] or marker['time'] > plot_xlim[1]:
+            # Resolve task reference formula if time= was not a literal float
+            if marker['time'] is None:
+                ref_edge, ref_proc, ref_task = marker['time_ref']
+                pos_key = (ref_proc, ref_task)
+                if pos_key in self.task_plot_positions:
+                    # Task was plotted — use its bar position directly
+                    pos_data = self.task_plot_positions[pos_key]
+                    resolved_time = pos_data['x_start'] if ref_edge == 'start' else pos_data['x_end']
+                else:
+                    # Task not in plot (e.g. excluded or parameter row) — look up in DataFrame
+                    mask = (self.dataframe['ProcessName'] == ref_proc) & (self.dataframe['TaskName'] == ref_task)
+                    matches = self.dataframe[mask]
+                    if matches.empty:
+                        debugging.print(
+                            f"WARNING: Marker '{marker['name']}': "
+                            f"task '{ref_proc}:{ref_task}' not found in data. Skipping."
+                        )
+                        continue
+                    row = matches.iloc[0]
+                    resolved_time = float(row['StartTime']) if ref_edge == 'start' else float(row['EndTime'])
+            else:
+                resolved_time = marker['time']
+
+            if resolved_time < plot_xlim[0] or resolved_time > plot_xlim[1]:
                 continue
             if marker['linewidth'] > 0 and marker['linestyle'] != 'None':
-                ax.axvline(x=marker['time'], linestyle=marker['linestyle'], color=marker['color'], linewidth=marker['linewidth'], zorder=4)
+                ax.axvline(x=resolved_time, linestyle=marker['linestyle'], color=marker['color'], linewidth=marker['linewidth'], zorder=4)
             pos = marker['position']
             if pos >= 1.0:
                 va = 'top'
@@ -751,7 +782,7 @@ class TimelinePlotWidget(QWidget):
             # User rotation: 0=vertical(bottom-to-top), 90=horizontal(left-to-right)
             # Matplotlib rotation: 0=horizontal, 90=vertical(bottom-to-top)
             mpl_rotation = 90.0 - marker['rotation']
-            txt = ax.text(marker['time'], pos, f" {marker['name']}", transform=ax.get_xaxis_transform(),
+            txt = ax.text(resolved_time, pos, f" {marker['name']}", transform=ax.get_xaxis_transform(),
                     fontsize=marker['fontsize'], fontweight=marker['fontweight'], fontstyle=marker['fontstyle'],
                     color=marker['color'], va=va, ha='left', rotation=mpl_rotation, clip_on=True)
             txt.set_clip_box(ax.bbox)

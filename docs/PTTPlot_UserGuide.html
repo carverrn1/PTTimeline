@@ -1145,8 +1145,8 @@ python pttplot.py path/to/file.pttd</code></pre>
 <span class="sk">position</span>  = <span class="sv">25%</span>         <span class="sc">; % is preserved literally by RawConfigParser</span>
 
 [ANNOTATIONS.MARKERS]
-<span class="sk">marker1</span> = <span class="sv">label=Project Start; time_float=0; linestyle=solid; linewidth_float=1.5;<br> color=#276749; fontsize_float=10; fontstyle=italic; position=Top; rotation_float=90</span>
-<span class="sk">marker2</span> = <span class="sv">label=Milestone A; time_float=30; linestyle=dashed; linewidth_float=1;<br> color=#c05621; fontsize_float=9; fontstyle=normal; position=25%; rotation_float=0</span></code></pre>
+<span class="sk">marker1</span> = <span class="sv">label=Project Start; time=0; linestyle=solid; linewidth_float=1.5;<br> color=#276749; fontsize_float=10; fontstyle=italic; position=Top; rotation_float=90</span>
+<span class="sk">marker2</span> = <span class="sv">label=Milestone A; time=End(Process1:Task3); linestyle=dashed; linewidth_float=1;<br> color=#c05621; fontsize_float=9; fontstyle=normal; position=25%; rotation_float=0</span></code></pre>
 
     <h3>Annotation Markers</h3>
     <p>
@@ -1166,7 +1166,7 @@ python pttplot.py path/to/file.pttd</code></pre>
     <h4>Marker Definition Format</h4>
     <p>Each marker is one INI line with 9 comma-separated fields:</p>
 
-    <pre><code>marker<span class="ss">N</span> = <span class="sv">label, time_float, linestyle, linewidth_float, color, fontsize_float, fontstyle, position, rotation_float</span></code></pre>
+    <pre><code>marker<span class="ss">N</span> = <span class="sv">label, time, linestyle, linewidth_float, color, fontsize_float, fontstyle, position, rotation_float</span></code></pre>
 
     <div class="table-wrap">
       <table>
@@ -1186,10 +1186,22 @@ python pttplot.py path/to/file.pttd</code></pre>
             <td><code>Project Start</code>, <code>Go-Live</code>, or empty</td>
           </tr>
           <tr>
-            <td><strong>time_float</strong></td>
-            <td>number</td>
-            <td>Horizontal position of the marker, in the same time units as the chart data.</td>
-            <td><code>0</code>, <code>30</code>, <code>-5</code>, <code>14.5</code></td>
+            <td><strong>time</strong></td>
+            <td>number&nbsp;or&nbsp;formula</td>
+            <td>
+              Horizontal position of the marker, in the same time units as the chart data.
+              Accepts either a numeric value or a task reference formula resolved at plot time:
+              <ul style="margin:0.4em 0 0 1.2em; padding:0;">
+                <li><code>time=5.0</code> &mdash; literal float</li>
+                <li><code>time=Start(ProcessName:TaskName)</code></li>
+                <li><code>time=End(ProcessName:TaskName)</code></li>
+              </ul>
+              Supported function names (case-insensitive): <code>Start</code>,
+              <code>StartTime</code>, <code>End</code>, <code>EndTime</code>.<br>
+              If the referenced <code>Process:Task</code> is not found in the plot data,
+              the marker is silently skipped and a warning is logged.
+            </td>
+            <td><code>0</code>, <code>14.5</code>,<br><code>Start(Proc1:Task2)</code>,<br><code>End(Proc1:Task2)</code></td>
           </tr>
           <tr>
             <td><strong>linestyle</strong></td>
@@ -1261,7 +1273,7 @@ python pttplot.py path/to/file.pttd</code></pre>
 
 [ANNOTATIONS.MARKERS]
 <span class="sc">; marker2 overrides only color and position; all other fields use section defaults:</span>
-<span class="sk">marker2</span> = <span class="sv">label=Milestone B; time_float=45; color=#c05621; position=25%</span></code></pre>
+<span class="sk">marker2</span> = <span class="sv">label=Milestone B; time=45; color=#c05621; position=25%</span></code></pre>
 
     <h4>Removing a Global Marker in a Per-File Presentation</h4>
     <p>
