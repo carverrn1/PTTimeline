@@ -3,11 +3,11 @@
 ; Applications: PTTEdit, PTTPlot, PTTView
 ; Publisher:    RNCSoftware
 ; Author:       Richard Carver
-; Version:      0.3.1
+; Version:      0.3.2
 
 #define AppName        "PTTimeline"
-#define AppVersion     "0.3.1"
-#define AppVerName     "PTTimeline 0.3.1"
+#define AppVersion     "0.3.2"
+#define AppVerName     "PTTimeline 0.3.2"
 #define AppPublisher   "RNCSoftware"
 #define AppAuthor      "Richard Carver"
 #define AppCopyright   "Copyright (C) 2026 Richard Carver"
@@ -30,7 +30,7 @@ DefaultDirName           ={commonpf}\{#AppPublisher}\{#AppName}
 DefaultGroupName         ={#AppName}
 DisableProgramGroupPage  =no
 OutputDir                =installer
-OutputBaseFilename       =PTTimeline-0.3.1-setup
+OutputBaseFilename       =PTTimeline-0.3.2-setup
 SetupIconFile            ={#ResourcesDir}\PTTimeline.ico
 LicenseFile              =license.txt
 Compression              =lzma2/ultra64
