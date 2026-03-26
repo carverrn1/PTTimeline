@@ -803,7 +803,7 @@ class DataFrameEditor(QMainWindow):
             button = QMessageBox.information(self, "Plotter already running","Close plotter to open a new plot")
         else:
             current_dir = os.getcwd()
-            python_exe = config["EXTERNAL_PROGRAMS"]['python_exe']
+            python_exe = sys.executable
             exe_name = config["EXTERNAL_PROGRAMS"]['plotter_exe']
             script_name = config["EXTERNAL_PROGRAMS"]['plotter_py']
             
@@ -826,7 +826,7 @@ class DataFrameEditor(QMainWindow):
                 if (Path(script_name).parent == Path('.')):         # If no path specified for script:
                     script_name = f"{_APP_DIR}/{script_name}"           # Prepend the _APP_DIR location
                 is_script_found = Path(script_name).is_file()       # Does my Python script exist
-                is_python_found = bool(shutil.which(python_exe))    # Can the OS find the Python interpretor
+                is_python_found = Path(python_exe).is_file()        # Can the OS find the Python interpretor
                 if (is_exe_found):
                     plotter_process_name = f"<{exe_name}>"
                 else:

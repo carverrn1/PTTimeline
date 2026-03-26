@@ -2254,7 +2254,7 @@ class MainWindow(QMainWindow):
         debugging.enter(f'image_file_path={image_file_path}, fmt={fmt}')
 
         try:
-            python_exe = config[CONFIG_EXTERNAL_PROGRAMS_OPTIONS][CONFIG_EXTERNAL_PROGRAMS_PYTHON_EXE]
+            python_exe = sys.executable
 
             # Select format-specific viewer config keys
             FORMAT_VIEWER_KEYS = {
