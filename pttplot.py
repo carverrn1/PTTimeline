@@ -195,8 +195,7 @@ rotation_float=0
 ;                        time=Start(ProcessName:TaskName)
 ;                        time=End(ProcessName:TaskName)
 ;                      Supported functions (must match exactly, same as PTTEdit):
-;                        Start, START, StartTime, STARTTIME,
-;                        End, END, EndTime, ENDTIME
+;                        Start, End
 ;   linestyle=       - Matplotlib line style: none, solid, dashed, dashdot, dotted
 ;                      (or shorthand: -, --, -., :)
 ;   linewidth_float= - Line width in points (0 = invisible line, label only)

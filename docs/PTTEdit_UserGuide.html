@@ -465,7 +465,8 @@
             <td><code>ProcessName</code></td>
             <td>
               Identifier for a process (a named row group). Must begin with a letter or
-              underscore, followed by letters, digits, or underscores only.
+              underscore, followed by letters, digits, or underscores only.<br>
+              <em>NOTE: The ProcessName may be left blank (i.e unnamed). This is a special case to allow pseudo-constants to be defined in the table, used in cell formulas, but not plotted. The TaskName is used as the name of the constant and referenced as ':task'in formulas (e.g. Value(:MOTOR1_MAX_TIME).</em>
             </td>
           </tr>
           <tr>
@@ -797,12 +798,12 @@
           <tr>
             <td><code>+</code></td>
             <td>Addition</td>
-            <td><code>EndTime($:Design) + 1</code></td>
+            <td><code>End($:Design) + 1</code></td>
           </tr>
           <tr>
             <td><code>-</code></td>
             <td>Subtraction</td>
-            <td><code>EndTime($:Build) - 0.5</code></td>
+            <td><code>End($:Build) - 0.5</code></td>
           </tr>
           <tr>
             <td><code>*</code></td>
@@ -836,27 +837,26 @@
         </thead>
         <tbody>
           <tr>
-            <td><code>StartTime(P:T)</code></td>
             <td><code>Start(P:T)</code></td>
-            <td>The evaluated start time of task <em>T</em> in process <em>P</em></td>
+            <td><code><em>none</em></code></td>
+            <td>The evaluated <span class="col-label">Start</span> time of task <em>T</em> in process <em>P</em></td>
           </tr>
           <tr>
-            <td><code>EndTime(P:T)</code></td>
             <td><code>End(P:T)</code></td>
-            <td>The evaluated end time of task <em>T</em> in process <em>P</em></td>
+            <td><code><em>none</em></code></td>
+            <td>The evaluated <span class="col-label">End</span> time of task <em>T</em> in process <em>P</em></td>
           </tr>
           <tr>
             <td><code>Duration(P:T)</code></td>
-            <td><code>Total(P:T)</code>, <code>Value(P:T)</code></td>
-            <td>The evaluated duration of task <em>T</em> in process <em>P</em></td>
+            <td><code>Value(P:T)</code></td>
+            <td>The evaluated <span class="col-label">Duration</span> time of task <em>T</em> in process <em>P</em></td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <p>
-      All function names are <strong>case-insensitive</strong>. <code>starttime</code>,
-      <code>StartTime</code>, and <code>STARTTIME</code> are all valid and equivalent.
+      All function names are <strong>case-sensitive</strong>.
     </p>
 
     <h3 id="multi-arg">Multi-Argument Functions</h3>
@@ -972,19 +972,19 @@
         </thead>
         <tbody>
           <tr>
-            <td><code>StartTime($:Task1)</code></td>
+            <td><code>Start($:Task1)</code></td>
             <td>Process1 : Task2</td>
-            <td><code>StartTime(Process1:Task1)</code></td>
+            <td><code>Start(Process1:Task1)</code></td>
           </tr>
           <tr>
-            <td><code>EndTime(Process1:$)</code></td>
+            <td><code>End(Process1:$)</code></td>
             <td>Process1 : Task2</td>
-            <td><code>EndTime(Process1:Task2)</code></td>
+            <td><code>End(Process1:Task2)</code></td>
           </tr>
           <tr>
-            <td><code>StartTime($:$)</code></td>
+            <td><code>Start($:$)</code></td>
             <td>Process1 : Task2</td>
-            <td><code>StartTime(Process1:Task2)</code></td>
+            <td><code>Start(Process1:Task2)</code></td>
           </tr>
         </tbody>
       </table>
@@ -1002,22 +1002,22 @@
 StartTimeFormula: 0
 
 <span class="comment"># Task ends 2.5 units after the Design task in the same process starts</span>
-EndTimeFormula:   StartTime($:Design) + 2.5
+EndTimeFormula:   Start($:Design) + 2.5
 
 <span class="comment"># Task starts immediately when its predecessor ends</span>
-StartTimeFormula: EndTime($:Design)
+StartTimeFormula: End($:Design)
 
 <span class="comment"># Task starts at the latest end time of two predecessor tasks</span>
-StartTimeFormula: Max(EndTime(TeamA:Design), EndTime(TeamB:Prototype))
+StartTimeFormula: Max(End(TeamA:Design), End(TeamB:Prototype))
 
 <span class="comment"># Task ends at the midpoint between two tasks</span>
-EndTimeFormula:   (EndTime($:PhaseA) + StartTime($:PhaseB)) / 2
+EndTimeFormula:   (End($:PhaseA) + Start($:PhaseB)) / 2
 
 <span class="comment"># Start at 5 if Design duration exceeds 3 units, otherwise start at 3</span>
 StartTimeFormula: If(IsGreaterThan(Duration($:Design), 3), 5, 3)
 
 <span class="comment"># Start only after both parallel branches complete</span>
-StartTimeFormula: Max(EndTime(Branch1:Build), EndTime(Branch2:Build))</code></pre>
+StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
 
     <h3 id="circular">Circular Reference Detection</h3>
 

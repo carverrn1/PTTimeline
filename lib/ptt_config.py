@@ -287,8 +287,7 @@ def _load_markers_from_ini(ini_cfg, config):
       time=Start(ProcessName:TaskName)
       time=End(ProcessName:TaskName)
     Supported function names (must match exactly, same as PTTEdit):
-                               Start, START, StartTime, STARTTIME,
-                               End, END, EndTime, ENDTIME.
+                               Start, End.
     Formula references are resolved at plot time against task_plot_positions.
     If the referenced task is not found in the plot data, the marker is skipped
     with a debug warning.
@@ -317,7 +316,7 @@ def _load_markers_from_ini(ini_cfg, config):
 
     # Regex for task reference formulas — explicit variants match PTTEdit's registered functions exactly.
     _TIME_REF_RE = re.compile(
-        r'^(StartTime|STARTTIME|Start|START|EndTime|ENDTIME|End|END)\s*\(\s*(.*?)\s*:\s*(.+?)\s*\)$'
+        r'^(Start|End)\s*\(\s*(.*?)\s*:\s*(.+?)\s*\)$'
     )
 
     def _get(key, fallback):

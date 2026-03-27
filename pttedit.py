@@ -406,68 +406,25 @@ class DataFrameEditor(QMainWindow):
         self.close_plot_on_exit = True
         self.evaluator = ExpressionEvaluator()
         
-        self.evaluator.register_function('StartTime', self.start_time)
-        self.evaluator.register_function('STARTTIME', self.start_time)
-        self.evaluator.register_function('Start', self.start_time)
-        self.evaluator.register_function('START', self.start_time)
-
-        self.evaluator.register_function('EndTime', self.end_time)
-        self.evaluator.register_function('ENDTIME', self.end_time)
-        self.evaluator.register_function('End', self.end_time)
-        self.evaluator.register_function('END', self.end_time)
-
+        self.evaluator.register_function('Start',    self.start_time)
+        self.evaluator.register_function('End',      self.end_time)
         self.evaluator.register_function('Duration', self.duration_time)
-        self.evaluator.register_function('DURATION', self.duration_time)
-        self.evaluator.register_function('Total', self.duration_time)
-        self.evaluator.register_function('TOTAL', self.duration_time)
-        self.evaluator.register_function('Value', self.duration_time)
-        self.evaluator.register_function('VALUE', self.duration_time)
+        self.evaluator.register_function('Value',    self.duration_time)
 
-        self.evaluator.register_multiarg_function('Min', self.min_values)
-        self.evaluator.register_multiarg_function('min', self.min_values)
-        self.evaluator.register_multiarg_function('MIN', self.min_values)
-        self.evaluator.register_multiarg_function('Max', self.max_values)
-        self.evaluator.register_multiarg_function('max', self.max_values)
-        self.evaluator.register_multiarg_function('MAX', self.max_values)
+        self.evaluator.register_multiarg_function('Min',            self.min_values)
+        self.evaluator.register_multiarg_function('Max',            self.max_values)
 
         self.evaluator.register_multiarg_function('IsLessThan',     self.is_less_than)
-        self.evaluator.register_multiarg_function('ISLESSTHAN',     self.is_less_than)
-        self.evaluator.register_multiarg_function('islessthan',     self.is_less_than)
-
         self.evaluator.register_multiarg_function('IsGreaterThan',  self.is_greater_than)
-        self.evaluator.register_multiarg_function('ISGREATERTHAN',  self.is_greater_than)
-        self.evaluator.register_multiarg_function('isgreaterthan',  self.is_greater_than)
-
         self.evaluator.register_multiarg_function('IsLessEqual',    self.is_less_equal)
-        self.evaluator.register_multiarg_function('ISLESSEQUAL',    self.is_less_equal)
-        self.evaluator.register_multiarg_function('islessequal',    self.is_less_equal)
-
         self.evaluator.register_multiarg_function('IsGreaterEqual', self.is_greater_equal)
-        self.evaluator.register_multiarg_function('ISGREATEREQUAL', self.is_greater_equal)
-        self.evaluator.register_multiarg_function('isgreaterequal', self.is_greater_equal)
-
         self.evaluator.register_multiarg_function('IsEqual',        self.is_equal)
-        self.evaluator.register_multiarg_function('ISEQUAL',        self.is_equal)
-        self.evaluator.register_multiarg_function('isequal',        self.is_equal)
-
         self.evaluator.register_multiarg_function('IsNotEqual',     self.is_not_equal)
-        self.evaluator.register_multiarg_function('ISNOTEQUAL',     self.is_not_equal)
-        self.evaluator.register_multiarg_function('isnotequal',     self.is_not_equal)
 
         self.evaluator.register_multiarg_function('If',             self.if_value)
-        self.evaluator.register_multiarg_function('IF',             self.if_value)
-
         self.evaluator.register_multiarg_function('Not',            self.not_value)
-        self.evaluator.register_multiarg_function('NOT',            self.not_value)
-        self.evaluator.register_multiarg_function('not',            self.not_value)
-
         self.evaluator.register_multiarg_function('Or',             self.or_values)
-        self.evaluator.register_multiarg_function('OR',             self.or_values)
-        self.evaluator.register_multiarg_function('or',             self.or_values)
-
         self.evaluator.register_multiarg_function('And',            self.and_values)
-        self.evaluator.register_multiarg_function('AND',            self.and_values)
-        self.evaluator.register_multiarg_function('and',            self.and_values)
 
         self.evaluator.register_multiarg_function('_grp',           self.grp_value)
 
@@ -1012,27 +969,27 @@ class DataFrameEditor(QMainWindow):
                 END_TIME_FORMULA_HDR:'1.0',
                 END_TIME_HDR:None, DURATION_HDR:None},
             {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task2',
-                START_TIME_FORMULA_HDR:'EndTime(Process1:Task1)',
+                START_TIME_FORMULA_HDR:'End(Process1:Task1)',
                 START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'StartTime(Process1:Task2)+Duration(Process1:Task1)',
+                END_TIME_FORMULA_HDR:'Start(Process1:Task2)+Duration(Process1:Task1)',
                 END_TIME_HDR:None,
                 DURATION_HDR:None},
             {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task3',
-                START_TIME_FORMULA_HDR:'EndTime(Process1:Task2)',
+                START_TIME_FORMULA_HDR:'End(Process1:Task2)',
                 START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'StartTime(Process1:Task3)+Duration(Process1:Task1)',
+                END_TIME_FORMULA_HDR:'Start(Process1:Task3)+Duration(Process1:Task1)',
                 END_TIME_HDR:None,
                 DURATION_HDR:None},
             {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task4',
-                START_TIME_FORMULA_HDR:'EndTime(Process1:Task3)',
+                START_TIME_FORMULA_HDR:'End(Process1:Task3)',
                 START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'StartTime(Process1:Task4)+Duration(Process1:Task1)',
+                END_TIME_FORMULA_HDR:'Start(Process1:Task4)+Duration(Process1:Task1)',
                 END_TIME_HDR:None,
                 DURATION_HDR:None},
             {PROCESS_NAME_HDR:'Process2', TASK_NAME_HDR:'Task1',
-                START_TIME_FORMULA_HDR:'StartTime(Process1:Task2)',
+                START_TIME_FORMULA_HDR:'Start(Process1:Task2)',
                 START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'StartTime(Process2:Task1)+2',
+                END_TIME_FORMULA_HDR:'Start(Process2:Task1)+2',
                 END_TIME_HDR:None, DURATION_HDR:None},
             ])
         debugging.print(f"\nself.dataframe before set_index(ProcessName,TaskName):")
