@@ -61,3 +61,7 @@ copy license.txt "%target_folder%"
 
 :: Cleanup unwanted files
 del "%target_folder%"\*.bak
+
+
+:: Open the folder
+explorer "Claude_Project_Files"
