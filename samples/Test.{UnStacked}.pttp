@@ -47,4 +47,4 @@ position = top
 rotation_float = 0.0
 
 [ANNOTATIONS.MARKERS]
-marker0 = label=←0.0 (NOTE: This demo Marker is defined in pttplot.ini. Remove 'marker0' in pttplot.ini OR define 'marker0=' in this plot's INI); time_float=0.0; linestyle=dotted; linewidth_float=6; color=red; fontsize_float=10; fontstyle=italic; position=top; rotation_float=90
+marker0 = label=←0.0 (NOTE: This demo Marker is defined in pttplot.ini. Remove 'marker0' in pttplot.ini OR define 'marker0=' in this plot's INI); time=0.0; linestyle=dotted; linewidth_float=6; color=red; fontsize_float=10; fontstyle=italic; position=top; rotation_float=90
