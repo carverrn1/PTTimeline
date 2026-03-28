@@ -1965,6 +1965,14 @@ class MainWindow(QMainWindow):
         with open(pttd_filename, 'r') as json_file:
             config_dataframe_dict = json.load(json_file)
 
+        # Extract time_unit from file_metadata (introduced in v0.3.2; default for older files)
+        raw_metadata = config_dataframe_dict.get('file_metadata', {})
+        time_unit = str(raw_metadata.get('time_unit', '')).strip()
+        if time_unit:
+            config[CONFIG_PLOTTING_OPTIONS][CONFIG_PLOTTING_X_AXIS_LABEL] = f'Time ({time_unit})'
+        else:
+            config[CONFIG_PLOTTING_OPTIONS][CONFIG_PLOTTING_X_AXIS_LABEL] = 'Time'
+
         # Load and process dataframe
         self.dataframe = pd.DataFrame.from_dict(config_dataframe_dict['dataframe'], orient='index')
         self.dataframe.index = self.dataframe.index.astype(int)     # Convert indexes to integers instead of strings

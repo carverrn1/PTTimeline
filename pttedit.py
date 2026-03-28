@@ -59,7 +59,8 @@ os.environ['QT_LOGGING_RULES'] = 'qt.qpa.screen.warning=false;qt.qpa.screen.debu
 
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QTableView, QMenuBar, QFileDialog, QVBoxLayout, QWidget, QAbstractItemView, 
-    QMenu, QStyledItemDelegate, QLineEdit, QMessageBox, QCompleter, QMessageBox, QHeaderView, QStyle
+    QMenu, QStyledItemDelegate, QLineEdit, QMessageBox, QCompleter, QMessageBox, QHeaderView, QStyle,
+    QComboBox, QLabel, QSizePolicy
     )
 from PySide6.QtCore import Qt, QRegularExpression, QStringListModel, QEvent
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QFont, QAction, QRegularExpressionValidator, QKeySequence, QIcon
@@ -67,6 +68,8 @@ from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QFont, QAct
 QT_ROLES = ['Qt.DisplayRole','Qt.DecorationRole','Qt.EditRole','Qt.ToolTipRole','Qt.StatusTipRole','Qt.WhatsThisRole','Qt.SizeHintRole']
 
 config = {}
+
+TIME_UNIT_OPTIONS = ['', 'ns', 'µs', 'ms', 's', 'min', 'hr', 'days']
 
 DEFAULT_CONFIG = """\
 [META]
@@ -401,6 +404,7 @@ class DataFrameEditor(QMainWindow):
         self.recalc_order = []
         self.pt_to_row_index = {}   # Fast O(1) lookup: process_task -> row_index
         self.workingFilename = None
+        self.file_metadata = {'time_unit': ''}   # File-level metadata; persisted in .pttd
         self.row_copy = None
         self.open_plot = None    # process object for open plotter
         self.close_plot_on_exit = True
@@ -466,21 +470,51 @@ class DataFrameEditor(QMainWindow):
         debugging.leave()
     
     def setup_status_bar(self):
-        """Initialize the status bar with general status and error count sections"""
+        """Initialize the status bar with general status, time unit selector, and error count sections"""
         debugging.enter()
-        from PySide6.QtWidgets import QLabel
-        
+
         # Left side: General status messages
         self.status_label = QLabel("Ready")
         self.status_bar.addWidget(self.status_label, 1)  # Stretch factor 1
-        
+
+        # Centre: Time unit label + editable combo box
+        time_unit_label = QLabel("Time Unit:")
+        self.status_bar.addPermanentWidget(time_unit_label)
+
+        self.time_unit_combo = QComboBox()
+        self.time_unit_combo.setEditable(True)
+        self.time_unit_combo.addItems(TIME_UNIT_OPTIONS)
+        self.time_unit_combo.setCurrentText('')
+        self.time_unit_combo.setFixedWidth(130)
+        self.time_unit_combo.setToolTip(
+            "Time unit label for this file.\n"
+            "Select from the list or type your own (e.g. cycles, ticks).\n"
+            "Leave blank for no unit label."
+        )
+        self.time_unit_combo.currentTextChanged.connect(self._on_time_unit_changed)
+        self.status_bar.addPermanentWidget(self.time_unit_combo)
+
         # Right side: Error count (permanent widget)
         self.error_label = QLabel("")
         self.status_bar.addPermanentWidget(self.error_label)
-        
+
         self.update_status_bar()
         debugging.leave()
     
+    def _on_time_unit_changed(self, text):
+        """Called when the time unit combo box value changes."""
+        new_unit = text.strip()
+        if self.file_metadata.get('time_unit', '') != new_unit:
+            self.file_metadata['time_unit'] = new_unit
+            self.set_file_modified(True)
+
+    def _set_time_unit_combo(self, unit):
+        """Set the time unit combo box without triggering the modified flag.
+        Used during file load/new/demo where the change is not a user edit."""
+        self.time_unit_combo.blockSignals(True)
+        self.time_unit_combo.setCurrentText(unit)
+        self.time_unit_combo.blockSignals(False)
+
     def count_errors(self):
         """Count the number of errors in the calculated columns"""
         debugging.enter()
@@ -546,7 +580,7 @@ class DataFrameEditor(QMainWindow):
     def check_unsaved_changes(self):
         """
         Check if file has unsaved changes and prompt user.
-        Returns True if it's safe to proceed, False if user cancelled.
+        Returns True if safe to proceed, False if user cancelled.
         """
         debugging.enter(f'file_modified={self.file_modified}')
         if not self.file_modified:
@@ -956,6 +990,8 @@ class DataFrameEditor(QMainWindow):
         self.update_status_bar("Loading demo...")
         QApplication.processEvents()  # Force UI update
         self.workingFilename = None
+        self.file_metadata = {'time_unit': ''}
+        self._set_time_unit_combo('')
         self.file_export_csv_action.setEnabled(False)
         self.file_export_ods_action.setEnabled(False)
         self.file_export_puml_action.setEnabled(False)
@@ -1011,6 +1047,8 @@ class DataFrameEditor(QMainWindow):
         self.update_status_bar("Creating new file...")
         QApplication.processEvents()  # Force UI update
         self.workingFilename = None
+        self.file_metadata = {'time_unit': ''}
+        self._set_time_unit_combo('')
         self.file_export_csv_action.setEnabled(False)
         self.file_export_ods_action.setEnabled(False)
         self.file_export_puml_action.setEnabled(False)
@@ -1224,6 +1262,10 @@ class DataFrameEditor(QMainWindow):
                 with open(self.workingFilename, 'r') as json_file:
                     config_dataframe_dict = json.load(json_file)
                     # print(config_dataframe_dict['dataframe'])
+                # Load file_metadata (introduced in v0.3.2; default for older files)
+                raw_metadata = config_dataframe_dict.get('file_metadata', {})
+                self.file_metadata = {'time_unit': str(raw_metadata.get('time_unit', ''))}
+                self._set_time_unit_combo(self.file_metadata['time_unit'])
                 self.dataframe = pd.DataFrame.from_dict(config_dataframe_dict['dataframe'], 
                                     # dtype={
                                         # 'ProcessName':      'string',
@@ -1281,6 +1323,10 @@ class DataFrameEditor(QMainWindow):
             update_splash(getattr(self, '_splash', None), getattr(self, '_splash_label', None), getattr(self, '_splash_img', None), 'Loading file...')
             with open(self.workingFilename, 'r') as json_file:
                 config_dataframe_dict = json.load(json_file)
+            # Load file_metadata (introduced in v0.3.2; default for older files)
+            raw_metadata = config_dataframe_dict.get('file_metadata', {})
+            self.file_metadata = {'time_unit': str(raw_metadata.get('time_unit', ''))}
+            self._set_time_unit_combo(self.file_metadata['time_unit'])
             self.dataframe = pd.DataFrame.from_dict(config_dataframe_dict['dataframe'], orient='index')
             self.dataframe.index = self.dataframe.index.astype(int)     # Convert indexes to integers instead of strings
             self.dataframe = self.dataframe.fillna('')   # Fill missing values with blanks
@@ -1708,6 +1754,11 @@ class DataFrameEditor(QMainWindow):
         # ── Build the .puml text ─────────────────────────────────────────────
         lines = ['@startuml']
 
+        # File metadata comment
+        time_unit = self.file_metadata.get('time_unit', '').strip()
+        if time_unit:
+            lines.append(f"' time_unit: {time_unit}")
+
         # Lifeline declarations
         for proc, task in ordered_lifelines:
             al = alias(proc, task)
@@ -1811,6 +1862,7 @@ class DataFrameEditor(QMainWindow):
         df = pd.DataFrame(data, columns=[COLUMN_NAMES[i] for i in range(self.model.columnCount())])
         df_json = df.to_json(orient ='index', force_ascii=True)
         config_dataframe_dict = {
+            'file_metadata': self.file_metadata,
             'config':config,
             'dataframe':json.loads(df_json)
             }
