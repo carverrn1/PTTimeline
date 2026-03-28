@@ -1102,6 +1102,29 @@ python pttplot.py path/to/file.pttd</code></pre>
       </table>
     </div>
 
+    <h3>Time Unit and X-Axis Label</h3>
+    <p>
+      The horizontal axis label is controlled by the <code>time_unit</code> field stored in the
+      <code>file_metadata</code> section of the <code>.pttd</code> file. This value is set in
+      PTTEdit via the <strong>Time Unit</strong> combo box in the status bar.
+    </p>
+    <ul>
+      <li>
+        If <code>time_unit</code> is <strong>blank</strong> (the default), the x-axis label
+        reads <strong>Time</strong>.
+      </li>
+      <li>
+        If <code>time_unit</code> is set (e.g. <code>ms</code>), the x-axis label reads
+        <strong>Time (ms)</strong>.
+      </li>
+    </ul>
+    <div class="note">
+      <strong>Note:</strong> The time unit is a label only &mdash; PTTPlot does not perform
+      any unit conversion or axis scaling. Files created before <code>v0.3.2</code> that lack
+      a <code>file_metadata</code> section are treated as having a blank unit, so their charts
+      are unaffected.
+    </div>
+
     <h3>Presentation File Naming</h3>
     <p>
       Each <code>.pttd</code> file can have multiple named presentation files, each stored as a

@@ -692,7 +692,9 @@
               current <code>.pttd</code> filename (same directory and base name, with
               a <code>.puml</code> extension). If a file with that name already exists,
               a confirmation dialog is shown before overwriting. This item is disabled
-              until a file has been loaded or saved.
+              until a file has been loaded or saved. If a time unit is set, it is
+              included as a comment in the <code>.puml</code> header
+              (e.g. <code>' time_unit: ms</code>).
               <div class="note" style="margin-top:0.6rem;">
                 <strong>Note:</strong> PTTEdit generates only the <code>.puml</code>
                 source file. Rendering the diagram image requires
@@ -721,21 +723,42 @@
     <p>
       PTTEdit data files use <strong>JSON5</strong> format (JSON extended with comment
       and trailing-comma support) and carry the <code>.pttd</code> extension. A
-      <code>.pttd</code> file stores:
+      <code>.pttd</code> file contains three top-level sections:
     </p>
 
-    <ul>
-      <li>
-        A <strong>config section</strong> with file-level metadata and any saved
-        configuration settings.
-      </li>
-      <li>
-        <strong>Row data</strong> for every task, including the raw formula strings
-        (<code>StartTimeFormula</code>, <code>EndTimeFormula</code>) and the last
-        evaluated numeric results (<code>StartTime</code>, <code>EndTime</code>,
-        <code>Duration</code>).
-      </li>
-    </ul>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Contents</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>file_metadata</code></td>
+            <td>
+              File-level metadata describing the data, including <code>time_unit</code>
+              (the time unit label set in the status bar). This section is read by both
+              PTTEdit and PTTPlot.
+            </td>
+          </tr>
+          <tr>
+            <td><code>config</code></td>
+            <td>
+              Application configuration settings saved with the file (DEBUGGING,
+              EXTERNAL_PROGRAMS, etc.).
+            </td>
+          </tr>
+          <tr>
+            <td><code>dataframe</code></td>
+            <td>
+              Row data for every task, including the raw formula strings
+              (<code>StartTimeFormula</code>, <code>EndTimeFormula</code>) and the last
+              evaluated numeric results (<code>StartTime</code>, <code>EndTime</code>,
+              <code>Duration</code>).
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <p>
       Because JSON5 is used, you may add <code>//</code> line comments or
@@ -744,6 +767,13 @@
       preserve comments; manual comments will be removed when the file is saved
       by PTTEdit.
     </p>
+
+    <div class="note">
+      <strong>Backward compatibility:</strong> Files created before <code>v0.3.2</code>
+      do not contain a <code>file_metadata</code> section. Both PTTEdit and PTTPlot treat
+      the absence of this section as equivalent to <code>time_unit = ""</code> (no unit
+      label), preserving existing behaviour.
+    </div>
 
     <div class="note">
       <strong>Note:</strong> <code>.pttd</code> files are plain text and are suitable
@@ -1350,7 +1380,8 @@ StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
 
     <p>
       The status bar runs along the bottom edge of the PTTEdit window and provides
-      real-time feedback in two zones:
+      real-time feedback. The left side shows status messages; the right side holds
+      the Time Unit selector and the error indicator:
     </p>
 
     <div class="table-wrap">
@@ -1368,7 +1399,21 @@ StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
             </td>
           </tr>
           <tr>
-            <td><strong>Right</strong></td>
+            <td><strong>Right &mdash; Time Unit</strong></td>
+            <td>
+              An editable combo box labelled <strong>Time Unit:</strong> that sets the
+              time unit label for the current file. Select a unit from the dropdown list
+              or type any custom label directly into the field. Leave blank for no unit
+              label (the default for new files).
+              <div class="note" style="margin-top:0.6rem;">
+                <strong>Note:</strong> The time unit is stored as file-level metadata in
+                the <code>.pttd</code> file and is used by PTTPlot to annotate the
+                horizontal axis. Changing the value marks the file as modified.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Far Right &mdash; Errors</strong></td>
             <td>
               Error summary indicator. Shows
               <strong style="color:#276749;">No errors</strong> in green when the
@@ -1379,6 +1424,38 @@ StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <h3>Time Unit Options</h3>
+
+    <p>
+      The following units are available in the dropdown list. Any custom label may also
+      be typed directly into the field (e.g. <code>cycles</code>, <code>ticks</code>,
+      <code>frames</code>).
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Value</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><em>(blank)</em></td><td>No unit label &mdash; x-axis reads <strong>Time</strong></td></tr>
+          <tr><td><code>ns</code></td><td>Nanoseconds</td></tr>
+          <tr><td><code>µs</code></td><td>Microseconds</td></tr>
+          <tr><td><code>ms</code></td><td>Milliseconds</td></tr>
+          <tr><td><code>s</code></td><td>Seconds</td></tr>
+          <tr><td><code>min</code></td><td>Minutes</td></tr>
+          <tr><td><code>hr</code></td><td>Hours</td></tr>
+          <tr><td><code>days</code></td><td>Days</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tip">
+      <strong>Tip:</strong> The time unit is a label only &mdash; PTTimeline does not
+      perform any unit conversion. Choose the unit that matches the numeric values you
+      have entered in the formula columns.
     </div>
   </section>
 
