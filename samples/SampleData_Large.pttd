@@ -1,9 +1,12 @@
 {
+    file_metadata: {
+        time_unit: "ns",
+    },
     config: {
         META: {
             app_package: "PTTimeline",
             app_name: "PTTEdit",
-            app_version: "0.3.0-dev.26030502",
+            app_version: "0.3.2-dev.8",
             ini_version: "1",
         },
         DEBUGGING: {
