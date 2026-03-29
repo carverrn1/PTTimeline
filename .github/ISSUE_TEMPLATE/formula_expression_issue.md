@@ -20,6 +20,6 @@ Paste your formula here
 **Actual result / error shown:**
 
 **Sample .pttd content (if possible):**
-(Note: Some file formats, like .pttd and .pttp, may not be allowed by GitHub so attach those in ZIP files.)
+_(Note: Some file formats, like .pttd and .pttp, may not be allowed by GitHub so attach those in ZIP files.)_
 
 **System Information:**

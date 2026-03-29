@@ -28,4 +28,4 @@ A clear description of what happened.
 Paste output from Help → System Information here.
 
 **Additional context:**
-(screenshots, sample .pttd files, etc. Note: Some file formats, like .pttd and .pttp, may not be allowed by GitHub so attach those in ZIP files.)
+_(screenshots, sample .pttd files, etc. Note: Some file formats, like .pttd and .pttp, may not be allowed by GitHub so attach those in ZIP files.)_
