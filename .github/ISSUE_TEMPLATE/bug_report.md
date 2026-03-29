@@ -13,7 +13,7 @@ assignees: carverrn1
 **Operating System:** Windows 11 / Windows 10 / macOS
 
 **Describe the bug:**
-A clear description of what happened.
+_A clear description of what happened._
 
 **Steps to reproduce:**
 1. 
@@ -25,7 +25,7 @@ A clear description of what happened.
 **Actual behavior:**
 
 **System Information:**
-Paste output from Help → System Information here.
+_See Help → System Information_
 
 **Additional context:**
 _(screenshots, sample .pttd files, etc. Note: Some file formats, like .pttd and .pttp, may not be allowed by GitHub so attach those in ZIP files.)_
