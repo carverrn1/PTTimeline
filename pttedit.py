@@ -510,7 +510,7 @@ class DataFrameEditor(QMainWindow):
 
     def _set_time_unit_combo(self, unit):
         """Set the time unit combo box without triggering the modified flag.
-        Used during file load/new/demo where the change is not a user edit."""
+        Used during file load/new where the change is not a user edit."""
         self.time_unit_combo.blockSignals(True)
         self.time_unit_combo.setCurrentText(unit)
         self.time_unit_combo.blockSignals(False)
@@ -563,8 +563,6 @@ class DataFrameEditor(QMainWindow):
         # Get base title
         if self.workingFilename:
             title = f"{PROGRAM_NAME} - {self.workingFilename}"
-        elif "*Demo*" in self.windowTitle():
-            title = f"{PROGRAM_NAME} - *Demo*"
         elif "*New*" in self.windowTitle():
             title = f"{PROGRAM_NAME} - *New*"
         else:
@@ -613,9 +611,6 @@ class DataFrameEditor(QMainWindow):
         debugging.enter()
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("&File")
-        file_demo_action = QAction("&Demo", self)
-        file_demo_action.triggered.connect(self.demo_timeline_file)
-        file_menu.addAction(file_demo_action)
         file_new_action = QAction("&New", self)
         file_new_action.triggered.connect(self.new_timeline_file)
         file_menu.addAction(file_new_action)
@@ -979,63 +974,6 @@ class DataFrameEditor(QMainWindow):
             </table>
             """
         QMessageBox.about(self, "System Information", sysinfo_text)
-        debugging.leave()
-
-    def demo_timeline_file(self):
-        debugging.enter()
-        if not self.check_unsaved_changes():
-            debugging.leave('Cancelled by user')
-            return
-        
-        self.update_status_bar("Loading demo...")
-        QApplication.processEvents()  # Force UI update
-        self.workingFilename = None
-        self.file_metadata = {'time_unit': ''}
-        self._set_time_unit_combo('')
-        self.file_export_csv_action.setEnabled(False)
-        self.file_export_ods_action.setEnabled(False)
-        self.file_export_puml_action.setEnabled(False)
-        self.setWindowTitle(f"{PROGRAM_NAME} - *Demo*")
-        self.dependency_graph = {}
-        self.recalc_order = []
-        self.dataframe = pd.DataFrame([
-            {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task1', 
-                START_TIME_FORMULA_HDR:'0.0',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'1.0',
-                END_TIME_HDR:None, DURATION_HDR:None},
-            {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task2',
-                START_TIME_FORMULA_HDR:'End(Process1:Task1)',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'Start(Process1:Task2)+Duration(Process1:Task1)',
-                END_TIME_HDR:None,
-                DURATION_HDR:None},
-            {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task3',
-                START_TIME_FORMULA_HDR:'End(Process1:Task2)',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'Start(Process1:Task3)+Duration(Process1:Task1)',
-                END_TIME_HDR:None,
-                DURATION_HDR:None},
-            {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task4',
-                START_TIME_FORMULA_HDR:'End(Process1:Task3)',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'Start(Process1:Task4)+Duration(Process1:Task1)',
-                END_TIME_HDR:None,
-                DURATION_HDR:None},
-            {PROCESS_NAME_HDR:'Process2', TASK_NAME_HDR:'Task1',
-                START_TIME_FORMULA_HDR:'Start(Process1:Task2)',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'Start(Process2:Task1)+2',
-                END_TIME_HDR:None, DURATION_HDR:None},
-            ])
-        debugging.print(f"\nself.dataframe before set_index(ProcessName,TaskName):")
-        debugging.print(f"{self.dataframe}")
-        # self.dataframe.set_index(['ProcessName', 'TaskName'], drop=False, inplace=True)     # Set the MultiIndex
-        debugging.print(f"\nself.dataframe after set_index(ProcessName,TaskName):")
-        debugging.print(f"{self.dataframe}")
-        self.apply_rules_and_populate_model()
-        self.set_fixed_column_widths()
-        self.set_file_modified(False)  # Demo is not considered modified
         debugging.leave()
 
     def new_timeline_file(self):
@@ -1879,7 +1817,7 @@ class DataFrameEditor(QMainWindow):
         self.table_view.setFocus()
 
         # If we have a working filename, save directly without prompting
-        if self.workingFilename and not self.windowTitle().endswith("*Demo*") and not self.windowTitle().endswith("*New*"):
+        if self.workingFilename and not self.windowTitle().endswith("*New*"):
             # Show busy cursor and status
             QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             self.setWindowTitle(f"Saving {os.path.basename(self.workingFilename)}...")
@@ -1902,7 +1840,7 @@ class DataFrameEditor(QMainWindow):
                 # Always restore cursor
                 QApplication.restoreOverrideCursor()
         else:
-            # No filename yet, or Demo/New file - use Save As dialog
+            # No filename yet, or New file - use Save As dialog
             self.save_as_timeline_file()
                 
         debugging.leave()
