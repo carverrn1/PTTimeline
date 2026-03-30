@@ -3,11 +3,11 @@
 ; Applications: PTTEdit, PTTPlot, PTTView
 ; Publisher:    RNCSoftware
 ; Author:       Richard Carver
-; Version:      0.4.0.1-dev
+; Version:      0.4.1.2-dev
 
 #define AppName        "PTTimeline"
-#define AppVersion     "0.4.0.1-dev"
-#define AppVerName     "PTTimeline 0.4.0.1-dev"
+#define AppVersion     "0.4.1.2-dev"
+#define AppVerName     "PTTimeline 0.4.1.2-dev"
 #define AppPublisher   "RNCSoftware"
 #define AppAuthor      "Richard Carver"
 #define AppCopyright   "Copyright (C) 2026 Richard Carver"
@@ -30,7 +30,7 @@ DefaultDirName           ={commonpf}\{#AppPublisher}\{#AppName}
 DefaultGroupName         ={#AppName}
 DisableProgramGroupPage  =no
 OutputDir                =installer
-OutputBaseFilename       =PTTimeline-0.4.0.1-dev-setup
+OutputBaseFilename       =PTTimeline-0.4.1.2-dev-setup
 SetupIconFile            ={#ResourcesDir}\PTTimeline.ico
 LicenseFile              =license.txt
 Compression              =lzma2/ultra64
@@ -106,9 +106,13 @@ Name: "{group}\Sample Files";         Filename: "{commondocs}\RNCSoftware\PTTime
 Name: "{group}\Uninstall PTTimeline"; Filename: "{uninstallexe}";   IconFilename: "{app}\resources\PTTimeline.ico"
 
 ; Desktop shortcuts — optional, installed directly on desktop (user choice during install)
-Name: "{commondesktop}\PTTEdit";  Filename: "{app}\pttedit.exe"; IconFilename: "{app}\resources\pttedit.ico"; Comment: "Process-Task Timeline Editor";  Tasks: desktopicons
-Name: "{commondesktop}\PTTPlot";  Filename: "{app}\pttplot.exe"; IconFilename: "{app}\resources\pttplot.ico"; Comment: "Process-Task Timeline Plotter"; Tasks: desktopicons
-Name: "{commondesktop}\PTTView";  Filename: "{app}\pttview.exe"; IconFilename: "{app}\resources\pttview.ico"; Comment: "Process-Task Timeline Viewer";  Tasks: desktopicons
+Name: "{commondesktop}\PTTEdit";  Filename: "{app}\pttedit.exe"; IconFilename: "{app}\resources\pttedit.ico"; Comment: "Process-Task Timeline v{#AppVersion} Editor";  Tasks: desktopicons
+Name: "{commondesktop}\PTTPlot";  Filename: "{app}\pttplot.exe"; IconFilename: "{app}\resources\pttplot.ico"; Comment: "Process-Task Timeline v{#AppVersion} Plotter"; Tasks: desktopicons
+Name: "{commondesktop}\PTTView";  Filename: "{app}\pttview.exe"; IconFilename: "{app}\resources\pttview.ico"; Comment: "Process-Task Timeline v{#AppVersion} Viewer";  Tasks: desktopicons
+; -----------------------------------------------------------------------------
+; Temporary desktop shortcut for uninstaller during development only
+; -----------------------------------------------------------------------------
+Name: "{userdesktop}\PTTimeline v{#AppVersion} Uninstall"; Filename: "{uninstallexe}"; IconFilename: "{app}\resources\PTTimeline.ico"; Comment: "Process-Task Timeline v{#AppVersion} Uninstall";  Tasks: desktopicons
 
 ; -----------------------------------------------------------------------------
 ; FILE ASSOCIATIONS
