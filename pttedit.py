@@ -32,6 +32,7 @@ PROGRAM_FILENAME = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 
 capitalize_first_four = lambda s: s[:4].upper() + s[4:]     # Capitalize first 4 letters
 from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID
+from ptt_utils import html_to_plain_text
 PROGRAM_NAME    = capitalize_first_four(PROGRAM_FILENAME)
 PACKAGE_NAME    = APP_PACKAGE
 
@@ -58,11 +59,11 @@ import numpy as np
 os.environ['QT_LOGGING_RULES'] = 'qt.qpa.screen.warning=false;qt.qpa.screen.debug=false'
 
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QTableView, QMenuBar, QFileDialog, QVBoxLayout, QWidget, QAbstractItemView, 
+    QApplication, QMainWindow, QTableView, QMenuBar, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QAbstractItemView, 
     QMenu, QStyledItemDelegate, QLineEdit, QMessageBox, QCompleter, QMessageBox, QHeaderView, QStyle,
-    QComboBox, QLabel, QSizePolicy
+    QComboBox, QLabel, QSizePolicy, QDialog, QPushButton
     )
-from PySide6.QtCore import Qt, QRegularExpression, QStringListModel, QEvent
+from PySide6.QtCore import Qt, QRegularExpression, QStringListModel, QEvent, QTimer
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QFont, QAction, QRegularExpressionValidator, QKeySequence, QIcon
 
 QT_ROLES = ['Qt.DisplayRole','Qt.DecorationRole','Qt.EditRole','Qt.ToolTipRole','Qt.StatusTipRole','Qt.WhatsThisRole','Qt.SizeHintRole']
@@ -875,20 +876,7 @@ class DataFrameEditor(QMainWindow):
     def show_about(self):
         """Display About dialog with version and copyright information"""
         debugging.enter()
-        
-        # Create a custom message box instead of using QMessageBox.about()
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(f"About {PROGRAM_NAME}")
-        
-        # Load and set the icon (adjust path as needed)
-        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
-        if Path(icon_path).is_file():
-            icon = QIcon(icon_path)
-            msg_box.setIconPixmap(icon.pixmap(48, 48))  # pixel display size
-        else:
-            # Fallback to default info icon if file not found
-            msg_box.setIcon(QMessageBox.Information)
-        
+
         about_text = f"""
             <h2>{PROGRAM_NAME}</h2>
             <p><b>Version:</b> {APP_VERSION}</p>
@@ -898,23 +886,70 @@ class DataFrameEditor(QMainWindow):
             <p><b>Date:</b> {APP_DATE}</p>
             <p>{APP_COPYRIGHT}</p>
             """
-        msg_box.setText(about_text)
-        msg_box.setTextFormat(Qt.RichText)
-        msg_box.exec()
-        
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"About {PROGRAM_NAME}")
+
+        # Icon (window title bar + body)
+        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
+        icon_exists = Path(icon_path).is_file()
+        if icon_exists:
+            icon = QIcon(icon_path)
+            dlg.setWindowIcon(icon)
+
+        # Body icon label (left side)
+        icon_label = QLabel()
+        if icon_exists:
+            icon_label.setPixmap(icon.pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignTop)
+
+        # Content
+        content = QLabel()
+        content.setTextFormat(Qt.RichText)
+        content.setText(about_text)
+        content.setWordWrap(True)
+        content.setOpenExternalLinks(True)
+
+        # Icon + content row
+        body_layout = QHBoxLayout()
+        body_layout.addWidget(icon_label)
+        body_layout.addWidget(content)
+
+        # Buttons
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        close_btn.setDefault(True)
+
+        def copy_to_clipboard():
+            QApplication.clipboard().setText(html_to_plain_text(about_text))
+            copy_btn.setText("Copied")
+            QTimer.singleShot(1500, lambda: copy_btn.setText("Copy to Clipboard"))
+
+        copy_btn.clicked.connect(copy_to_clipboard)
+        close_btn.clicked.connect(dlg.accept)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout = QVBoxLayout(dlg)
+        layout.addLayout(body_layout)
+        layout.addLayout(btn_layout)
+
+        dlg.exec()
         debugging.leave()
 
     def show_system_info(self):
         """Display System Information dialog with Python and module versions"""
         debugging.enter()
-        
+
         # Get Python version
-        # python_version = sys.version.split()[0]
         python_version, python_details = sys.version.split(' ',1)
         python_build, python_compile = python_details.split(') [',1)
         python_build = python_build + ')'
         python_compile = '[' + python_compile
-        
+
         # Get module versions
         module_list = ['PySide6','pandas','numpy','configparser','platformdirs','json5','configupdater','odfpy']
         module_versions = []
@@ -924,20 +959,17 @@ class DataFrameEditor(QMainWindow):
                 module_versions.append(f"<tr><td>&nbsp;&nbsp;{module_name}</td><td>&nbsp;{ver}</td></tr>")
             except Exception:
                 module_versions.append(f"<tr><td>&nbsp;&nbsp;{module_name}</td><td>&nbsp;<i>(version not found)</i></td></tr>")
-        
+
         # Get OS information with Windows 11 detection
         platform_str = platform.platform()
         os_name = platform.system()
         os_release = platform.release()
-        
-        # Check if Windows 11 based on build number
+
         if os_name == "Windows" and os_release == "10":
-            # Extract build number from platform string
-            # Format: Windows-10-10.0.BUILDNUMBER-SP0
             build_match = re.search(r'10\.0\.(\d+)', platform_str)
             if build_match:
                 build_num = int(build_match.group(1))
-                if build_num >= 22000:  # Windows 11 starts at build 22000
+                if build_num >= 22000:
                     os_info = f"Windows 11 (Build {build_num})"
                 else:
                     os_info = f"Windows 10 (Build {build_num})"
@@ -945,11 +977,11 @@ class DataFrameEditor(QMainWindow):
                 os_info = f"{os_name} {os_release}"
         else:
             os_info = f"{os_name} {os_release}"
-        
+
         # Get file paths
         current_dir = os.getcwd()
         script_path = os.path.dirname(os.path.abspath(__file__))
-        
+
         sysinfo_text = f"""
             <h3>System Information</h3>
             <p><b>Application:</b> {PROGRAM_NAME} v{APP_VERSION}</p>
@@ -958,8 +990,7 @@ class DataFrameEditor(QMainWindow):
             <p><b>Platform:</b> {platform_str}</p>
 
             <p><b>Python Version:</b> {python_version}<br>&nbsp;&nbsp;{python_build}<br>&nbsp;&nbsp;{python_compile}</p>
-            <p><b>Third-Party Packages:</b></p
-            >
+            <p><b>Third-Party Packages:</b></p>
             <table border="0" cellpadding="0">
             {''.join(module_versions)}
             </table>
@@ -973,7 +1004,52 @@ class DataFrameEditor(QMainWindow):
             <tr><td><b>Debug<br>Logging:</b></td><td><b>Enabled:</b> {debugging_enabled}<br><b>File:</b> {os.path.basename(debugging_filename)}</td></tr>
             </table>
             """
-        QMessageBox.about(self, "System Information", sysinfo_text)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("System Information")
+
+        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
+        icon_exists = Path(icon_path).is_file()
+        if icon_exists:
+            icon = QIcon(icon_path)
+            dlg.setWindowIcon(icon)
+
+        icon_label = QLabel()
+        if icon_exists:
+            icon_label.setPixmap(icon.pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignTop)
+
+        content = QLabel()
+        content.setTextFormat(Qt.RichText)
+        content.setText(sysinfo_text)
+        content.setWordWrap(True)
+
+        body_layout = QHBoxLayout()
+        body_layout.addWidget(icon_label)
+        body_layout.addWidget(content)
+
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        close_btn.setDefault(True)
+
+        def copy_to_clipboard():
+            QApplication.clipboard().setText(html_to_plain_text(sysinfo_text))
+            copy_btn.setText("Copied")
+            QTimer.singleShot(1500, lambda: copy_btn.setText("Copy to Clipboard"))
+
+        copy_btn.clicked.connect(copy_to_clipboard)
+        close_btn.clicked.connect(dlg.accept)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout = QVBoxLayout(dlg)
+        layout.addLayout(body_layout)
+        layout.addLayout(btn_layout)
+
+        dlg.exec()
         debugging.leave()
 
     def new_timeline_file(self):
