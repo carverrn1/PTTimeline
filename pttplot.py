@@ -52,8 +52,8 @@ def show_splash():
 # Setup program name and version information
 PROGRAM_FILENAME = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 capitalize_first_four = lambda s: s[:4].upper() + s[4:]     # Capitalize first 4 letters
-from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID
-from ptt_utils import html_to_plain_text
+from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID, APP_REPO_URL
+from ptt_utils import html_to_plain_text, build_issue_url, get_os_info
 PROGRAM_NAME    = capitalize_first_four(PROGRAM_FILENAME)
 PACKAGE_NAME    = APP_PACKAGE
 
@@ -1641,6 +1641,28 @@ class MainWindow(QMainWindow):
         help_sysinfo_action = QAction('&System Information', self)
         help_sysinfo_action.triggered.connect(self.show_system_info)
         help_menu.addAction(help_sysinfo_action)
+
+        help_menu.addSeparator()
+
+        support_menu = help_menu.addMenu('S&upport')
+
+        support_discussions_action = QAction('&Discussions', self)
+        support_discussions_action.triggered.connect(self.open_discussions)
+        support_menu.addAction(support_discussions_action)
+
+        support_issues_action = QAction('&Issues', self)
+        support_issues_action.triggered.connect(self.open_issues)
+        support_menu.addAction(support_issues_action)
+
+        support_menu.addSeparator()
+
+        support_bug_action = QAction('Submit &Bug Report', self)
+        support_bug_action.triggered.connect(self.submit_bug_report)
+        support_menu.addAction(support_bug_action)
+
+        support_feature_action = QAction('Submit &Feature Request', self)
+        support_feature_action.triggered.connect(self.submit_feature_request)
+        support_menu.addAction(support_feature_action)
         
         debugging.leave()
         return
@@ -2425,10 +2447,8 @@ class MainWindow(QMainWindow):
         debugging.leave()
 
 
-    def show_system_info(self):
-        """Display System Information dialog with Python and module versions"""
-        debugging.enter()
-
+    def _build_sysinfo_html(self) -> str:
+        """Build and return the System Information HTML string."""
         # Get Python version
         python_version, python_details = sys.version.split(' ', 1)
         python_build, python_compile = python_details.split(') [', 1)
@@ -2445,29 +2465,12 @@ class MainWindow(QMainWindow):
             except Exception:
                 module_versions.append(f"<tr><td>&nbsp;&nbsp;{module_name}</td><td>&nbsp;<i>(version not found)</i></td></tr>")
 
-        # Get OS information with Windows 11 detection
+        os_info      = get_os_info()
         platform_str = platform.platform()
-        os_name = platform.system()
-        os_release = platform.release()
+        current_dir  = os.getcwd()
+        script_path  = os.path.dirname(os.path.abspath(__file__))
 
-        if os_name == "Windows" and os_release == "10":
-            build_match = re.search(r'10\.0\.(\d+)', platform_str)
-            if build_match:
-                build_num = int(build_match.group(1))
-                if build_num >= 22000:
-                    os_info = f"Windows 11 (Build {build_num})"
-                else:
-                    os_info = f"Windows 10 (Build {build_num})"
-            else:
-                os_info = f"{os_name} {os_release}"
-        else:
-            os_info = f"{os_name} {os_release}"
-
-        # Get file paths
-        current_dir = os.getcwd()
-        script_path = os.path.dirname(os.path.abspath(__file__))
-
-        sysinfo_text = f"""
+        return f"""
             <h3>System Information</h3>
             <p><b>Application:</b> {PROGRAM_NAME} v{APP_VERSION}</p>
 
@@ -2489,6 +2492,12 @@ class MainWindow(QMainWindow):
             <tr><td><b>Debug<br>Logging:</b></td><td><b>Enabled:</b> {debugging_enabled}<br><b>File:</b> {os.path.basename(debugging_filename) if debugging_filename else 'None'}</td></tr>
             </table>
             """
+
+    def show_system_info(self):
+        """Display System Information dialog with Python and module versions"""
+        debugging.enter()
+
+        sysinfo_text = self._build_sysinfo_html()
 
         dlg = QDialog(self)
         dlg.setWindowTitle("System Information")
@@ -2537,8 +2546,48 @@ class MainWindow(QMainWindow):
         dlg.exec()
         debugging.leave()
 
+    def open_discussions(self):
+        """Open the PTTimeline GitHub Discussions page in the default browser."""
+        webbrowser.open_new_tab(f"{APP_REPO_URL}/discussions")
+
+    def open_issues(self):
+        """Open the PTTimeline GitHub Issues page in the default browser."""
+        webbrowser.open_new_tab(f"{APP_REPO_URL}/issues")
+
+    def submit_bug_report(self):
+        """Open a pre-filled GitHub bug report issue form in the default browser."""
+        debugging.enter()
+        try:
+            context = {
+                "Which Application(s)?": PROGRAM_NAME,
+                "Version":               f"v{APP_VERSION}",
+                "Operating System":      get_os_info(),
+                "System Information":    html_to_plain_text(self._build_sysinfo_html()),
+            }
+            url = build_issue_url(APP_REPO_URL, "bug_report.md", context)
+            webbrowser.open_new_tab(url)
+        except Exception as e:
+            QMessageBox.warning(self, "Network Error",
+                f"Could not reach GitHub to open the bug report form.\n\nPlease check your internet connection and try again.\n\nDetails: {e}")
+        debugging.leave()
+
+    def submit_feature_request(self):
+        """Open a pre-filled GitHub feature request issue form in the default browser."""
+        debugging.enter()
+        try:
+            context = {
+                "Which application(s)?": PROGRAM_NAME,
+                "Version":               f"v{APP_VERSION}",
+                "Operating System":      get_os_info(),
+            }
+            url = build_issue_url(APP_REPO_URL, "feature_request.md", context)
+            webbrowser.open_new_tab(url)
+        except Exception as e:
+            QMessageBox.warning(self, "Network Error",
+                f"Could not reach GitHub to open the feature request form.\n\nPlease check your internet connection and try again.\n\nDetails: {e}")
+        debugging.leave()
+
     def show_user_guide(self):
-        """Open the PTTPlot User Guide HTML file in the default browser."""
         guide_path = Path(_APP_DIR) / "docs" / "PTTPlot_UserGuide.html"
         if guide_path.is_file():
             webbrowser.open_new_tab(guide_path.as_uri())

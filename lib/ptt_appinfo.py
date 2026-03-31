@@ -46,7 +46,8 @@ APP_COMPANY     = "RNCSoftware"
 APP_DATE        = "2026-03-30"
 APP_COPYRIGHT   = f"© 2026 by {APP_AUTHOR}"
 
-APP_ID = "com.RNCSoftware.PTTimeline".lower()   # DON'T CHANGE! Used to locate user specific application data (e.g. %APP_DATA%)
+APP_ID       = "com.RNCSoftware.PTTimeline".lower()   # DON'T CHANGE! Used to locate user specific application data (e.g. %APP_DATA%)
+APP_REPO_URL = "https://github.com/carverrn1/PTTimeline"
 
 # Semantic versioning: MAJOR.MINOR.PATCH[-PRERELEASE]
 # MAJOR: Breaking changes
