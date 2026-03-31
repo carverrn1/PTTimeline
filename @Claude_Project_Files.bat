@@ -37,6 +37,7 @@ copy "lib\ptt_config.py" "%target_folder%"
 copy "lib\ptt_appinfo.py" "%target_folder%"
 copy "lib\ptt_debugging.py" "%target_folder%"
 copy "lib\ptt_splash.py" "%target_folder%"
+copy "lib\ptt_utils.py" "%target_folder%"
 
 REM copy resources\*.ico "%target_folder%"
 
