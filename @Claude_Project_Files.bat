@@ -24,6 +24,7 @@ mkdir "%target_folder%"
 copy Claude_Project_Files.bat "%target_folder%"
 copy DECISIONS.md "%target_folder%"
 copy PTTimeline_Program_Files_Layout.txt "%target_folder%"
+copy *.ps1 "%target_folder%"
 
 :: Source Files
 copy requirements.txt "%target_folder%"
