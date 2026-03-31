@@ -8,7 +8,9 @@ assignees: carverrn1
 
 **Application:** PTTEdit
 
-**Version:**
+**Version:** (e.g. v0.4.0-dev)
+
+**Operating System:** Windows 11 / Windows 10 / macOS
 
 **Formula that causes the issue:**
 ```

@@ -6,7 +6,8 @@ labels: bug
 assignees: carverrn1
 ---
 
-**Application:** PTTEdit / PTTPlot / PTTView  (delete as appropriate)
+**Which Application(s)?**
+PTTEdit / PTTPlot / PTTView / All
 
 **Version:** (e.g. v0.4.0-dev)
 
