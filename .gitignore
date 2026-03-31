@@ -76,7 +76,8 @@ $RECYCLE.BIN/
 .idea/
 
 # -----------------------------------------------------------------------------
-# Miscellaneous
+# Miscellaneous/Delvelopment artificats
 # -----------------------------------------------------------------------------
 filelist.txt
 *.lnk
+PTTimeline_Issues.md
