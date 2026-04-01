@@ -61,7 +61,7 @@ os.environ['QT_LOGGING_RULES'] = 'qt.qpa.screen.warning=false;qt.qpa.screen.debu
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QTableView, QMenuBar, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QAbstractItemView, 
     QMenu, QStyledItemDelegate, QLineEdit, QMessageBox, QCompleter, QMessageBox, QHeaderView, QStyle,
-    QComboBox, QLabel, QSizePolicy, QDialog, QPushButton
+    QComboBox, QLabel, QSizePolicy, QDialog, QPushButton, QRadioButton, QGroupBox, QTextEdit
     )
 from PySide6.QtCore import Qt, QRegularExpression, QStringListModel, QEvent, QTimer
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QFont, QAction, QRegularExpressionValidator, QKeySequence, QIcon
@@ -373,6 +373,399 @@ class DataFrameModel(QStandardItemModel):
         debugging.leave()
 
 
+class FindDialog(QDialog):
+    """Modeless Find dialog for PTTEdit.
+
+    Searches Process, Task, Start-ƒ, and End-ƒ columns for literal text.
+    Navigates to matching cells via Find Next / Find Previous.
+    """
+
+    # Columns searched, in left-to-right display order
+    SEARCH_COLUMNS = [
+        column_index(PROCESS_NAME_HDR),
+        column_index(TASK_NAME_HDR),
+        column_index(START_TIME_FORMULA_HDR),
+        column_index(END_TIME_FORMULA_HDR),
+    ]
+
+    def __init__(self, window):
+        super().__init__(window, Qt.Tool)
+        self.window = window
+        self.setWindowTitle("Find")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        # --- Find field ---
+        find_label = QLabel("Find what:")
+        self.find_edit = QLineEdit()
+        self.find_edit.setMinimumWidth(280)
+        self.find_edit.returnPressed.connect(self.find_next)
+
+        find_layout = QHBoxLayout()
+        find_layout.addWidget(find_label)
+        find_layout.addWidget(self.find_edit)
+
+        # --- Options ---
+        # An ungrouped QRadioButton with setAutoExclusive(False) acts as a checkbox.
+        self.case_checkbox = QRadioButton("Case sensitive")
+        self.case_checkbox.setAutoExclusive(False)
+
+        options_layout = QHBoxLayout()
+        options_layout.addWidget(self.case_checkbox)
+        options_layout.addStretch()
+
+        # --- Buttons ---
+        self.find_next_btn = QPushButton("Find Next")
+        self.find_next_btn.setDefault(True)
+        self.find_next_btn.clicked.connect(self.find_next)
+
+        self.find_prev_btn = QPushButton("Find Previous")
+        self.find_prev_btn.clicked.connect(self.find_prev)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.find_prev_btn)
+        btn_layout.addWidget(self.find_next_btn)
+        btn_layout.addWidget(close_btn)
+
+        # --- Status label ---
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: gray;")
+
+        # --- Top-level layout ---
+        layout = QVBoxLayout(self)
+        layout.addLayout(find_layout)
+        layout.addLayout(options_layout)
+        layout.addWidget(self.status_label)
+        layout.addLayout(btn_layout)
+
+        self.find_edit.textChanged.connect(self._clear_status)
+
+    def _clear_status(self):
+        self.status_label.setText("")
+        self.status_label.setStyleSheet("color: gray;")
+
+    def _set_status(self, text, error=False):
+        self.status_label.setText(text)
+        self.status_label.setStyleSheet("color: red;" if error else "color: gray;")
+
+    def _get_all_matches(self):
+        """Return a list of (row, col) tuples for all cells matching the current search text."""
+        search_text = self.find_edit.text()
+        if not search_text:
+            return []
+        case_sensitive = self.case_checkbox.isChecked()
+        model = self.window.model
+        matches = []
+        for row in range(model.rowCount()):
+            for col in self.SEARCH_COLUMNS:
+                item = model.item(row, col)
+                if item is None:
+                    continue
+                cell_text = item.text()
+                if case_sensitive:
+                    if search_text in cell_text:
+                        matches.append((row, col))
+                else:
+                    if search_text.lower() in cell_text.lower():
+                        matches.append((row, col))
+        return matches
+
+    def _navigate_to(self, row, col):
+        """Select and scroll to the given cell in the table."""
+        index = self.window.model.index(row, col)
+        self.window.table_view.setCurrentIndex(index)
+        self.window.table_view.scrollTo(index)
+
+    def _current_position(self):
+        """Return the (row, col) of the currently selected cell, or (-1, -1)."""
+        current = self.window.table_view.currentIndex()
+        if current.isValid():
+            return current.row(), current.column()
+        return -1, -1
+
+    def find_next(self):
+        """Navigate to the next match after the current cell position."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        matches = self._get_all_matches()
+        if not matches:
+            self._set_status(f'"{search_text}" not found.', error=True)
+            return
+        cur_row, cur_col = self._current_position()
+        # Find first match strictly after current position (row-major order)
+        for (row, col) in matches:
+            if (row, col) > (cur_row, cur_col):
+                self._navigate_to(row, col)
+                self._set_status(f"Match {matches.index((row, col)) + 1} of {len(matches)}")
+                return
+        # Wrap around to first match
+        self._navigate_to(*matches[0])
+        self._set_status(f"Wrapped. Match 1 of {len(matches)}")
+
+    def find_prev(self):
+        """Navigate to the previous match before the current cell position."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        matches = self._get_all_matches()
+        if not matches:
+            self._set_status(f'"{search_text}" not found.', error=True)
+            return
+        cur_row, cur_col = self._current_position()
+        # Find last match strictly before current position (row-major order)
+        for (row, col) in reversed(matches):
+            if (row, col) < (cur_row, cur_col):
+                self._navigate_to(row, col)
+                self._set_status(f"Match {matches.index((row, col)) + 1} of {len(matches)}")
+                return
+        # Wrap around to last match
+        self._navigate_to(*matches[-1])
+        self._set_status(f"Wrapped. Match {len(matches)} of {len(matches)}")
+
+
+class RenamePreviewDialog(QDialog):
+    """Modal preview dialog showing all changes that Rename All will make.
+
+    Displayed by RenameDialog.preview_all() before committing the rename.
+    Contains a scrollable read-only text area listing every before/after
+    change, plus a Rename All button to commit directly from the preview.
+    """
+
+    def __init__(self, parent, changes, rename_callback):
+        """
+        parent          -- the RenameDialog instance (modal parent)
+        changes         -- list of (line_no, before_label, after_label) tuples
+                           as produced by DataFrameEditor.collect_rename_changes()
+        rename_callback -- callable with no args; executes the actual rename
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Rename Preview")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint)
+        self.setMinimumSize(600, 400)
+        self._rename_callback = rename_callback
+
+        # --- Build preview text ---
+        lines = []
+        for line_no, before, after in changes:
+            lines.append(f"{line_no}: {before}")
+            lines.append(f"  \u2192 {after}")   # → (U+2192)
+        preview_text = '\n'.join(lines)
+
+        # --- Scrollable read-only text area ---
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setFontFamily("Courier New")
+        self.text_edit.setPlainText(preview_text)
+
+        # --- Summary label ---
+        noun = "change" if len(changes) == 1 else "changes"
+        summary = QLabel(f"{len(changes)} {noun} will be made.")
+        summary.setStyleSheet("font-weight: bold;")
+
+        # --- Buttons ---
+        rename_btn = QPushButton("Rename All")
+        rename_btn.setDefault(True)
+        rename_btn.clicked.connect(self._do_rename)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.reject)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(rename_btn)
+        btn_layout.addWidget(close_btn)
+
+        # --- Top-level layout ---
+        layout = QVBoxLayout(self)
+        layout.addWidget(summary)
+        layout.addWidget(self.text_edit)
+        layout.addLayout(btn_layout)
+
+    def _do_rename(self):
+        """Execute the rename then close the preview."""
+        self._rename_callback()
+        self.accept()
+
+
+class RenameDialog(QDialog):
+    """Modeless Rename dialog for PTTEdit.
+
+    Renames a Process Name or Process:Task Name atomically across the
+    entire file — Process column cells and formula references — without
+    breaking existing formula dependencies.
+    """
+
+    # Validation patterns
+    _PROCESS_RE = re.compile(r'^[A-Za-z0-9_]+$')
+    _PT_RE      = re.compile(r'^[A-Za-z0-9_]*:[A-Za-z0-9_]+$')
+
+    def __init__(self, window):
+        super().__init__(window, Qt.Tool)
+        self.window = window
+        self.setWindowTitle("Rename")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        # --- Scope group (vertical radio buttons) ---
+        scope_group = QGroupBox("Rename:")
+        self.process_radio = QRadioButton("Process Names")
+        self.pt_radio      = QRadioButton("Process:Task Names")
+        self.process_radio.setChecked(True)
+
+        scope_layout = QVBoxLayout()
+        scope_layout.addWidget(self.process_radio)
+        scope_layout.addWidget(self.pt_radio)
+        scope_group.setLayout(scope_layout)
+
+        # --- From field (label above input) ---
+        from_label = QLabel("From:")
+        self.from_edit = QLineEdit()
+        self.from_edit.setMinimumWidth(360)
+
+        # --- To field (label above input) ---
+        to_label = QLabel("To:")
+        self.to_edit = QLineEdit()
+        self.to_edit.setMinimumWidth(360)
+
+        # --- Status label ---
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: gray;")
+
+        # --- Buttons ---
+        preview_btn = QPushButton("Preview All")
+        preview_btn.clicked.connect(self.preview_all)
+
+        self.rename_all_btn = QPushButton("Rename All")
+        self.rename_all_btn.setDefault(True)
+        self.rename_all_btn.clicked.connect(self.rename_all)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(preview_btn)
+        btn_layout.addWidget(self.rename_all_btn)
+        btn_layout.addWidget(close_btn)
+
+        # --- Top-level layout ---
+        layout = QVBoxLayout(self)
+        layout.addWidget(scope_group)
+        layout.addWidget(from_label)
+        layout.addWidget(self.from_edit)
+        layout.addWidget(to_label)
+        layout.addWidget(self.to_edit)
+        layout.addWidget(self.status_label)
+        layout.addLayout(btn_layout)
+
+        self.from_edit.textChanged.connect(self._clear_status)
+        self.to_edit.textChanged.connect(self._clear_status)
+        self.process_radio.toggled.connect(self._clear_status)
+
+    def _clear_status(self):
+        self.status_label.setText("")
+        self.status_label.setStyleSheet("color: gray;")
+
+    def _set_status(self, text, error=False, success=False):
+        self.status_label.setText(text)
+        if error:
+            self.status_label.setStyleSheet("color: red;")
+        elif success:
+            self.status_label.setStyleSheet("color: green;")
+        else:
+            self.status_label.setStyleSheet("color: gray;")
+
+    def _validate(self):
+        """Validate From/To fields for the current scope mode.
+        Returns (from_text, to_text, mode) on success, or None on failure
+        (sets status label with the error message).
+        """
+        from_text = self.from_edit.text().strip()
+        to_text   = self.to_edit.text().strip()
+
+        if self.process_radio.isChecked():
+            mode = 'process'
+            if not from_text:
+                self._set_status("'From' must not be blank for Process Names.", error=True)
+                return None
+            if not to_text:
+                self._set_status("'To' must not be blank for Process Names.", error=True)
+                return None
+            if not self._PROCESS_RE.match(from_text):
+                self._set_status("'From' must contain only letters, digits, or underscores.", error=True)
+                return None
+            if not self._PROCESS_RE.match(to_text):
+                self._set_status("'To' must contain only letters, digits, or underscores.", error=True)
+                return None
+        else:
+            mode = 'process_task'
+            for field_label, text in (("'From'", from_text), ("'To'", to_text)):
+                if not self._PT_RE.match(text):
+                    self._set_status(
+                        f"{field_label} must be in the form Process:Task or :Task "
+                        f"(letters, digits, underscores only; colon required; Task must not be blank).",
+                        error=True)
+                    return None
+
+        if from_text == to_text:
+            self._set_status("'From' and 'To' are identical — nothing to rename.", error=True)
+            return None
+
+        return from_text, to_text, mode
+
+    def preview_all(self):
+        """Collect changes via dry-run and show the preview dialog (modal)."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        result = self._validate()
+        if result is None:
+            return
+        from_text, to_text, mode = result
+
+        changes = self.window.collect_rename_changes(from_text, to_text, mode)
+        if not changes:
+            self._set_status(f'"{from_text}" not found — nothing to rename.', error=True)
+            return
+
+        self._clear_status()
+
+        def do_rename():
+            count = self.window.do_rename_all(from_text, to_text, mode)
+            noun = "occurrence" if count == 1 else "occurrences"
+            self._set_status(f"Renamed {count} {noun}.", success=True)
+
+        dlg = RenamePreviewDialog(self, changes, do_rename)
+        dlg.exec()
+
+    def rename_all(self):
+        """Validate inputs then delegate to DataFrameEditor.do_rename_all()."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        result = self._validate()
+        if result is None:
+            return
+        from_text, to_text, mode = result
+        count = self.window.do_rename_all(from_text, to_text, mode)
+        if count == 0:
+            self._set_status(f'"{from_text}" not found — nothing renamed.', error=True)
+        else:
+            noun = "occurrence" if count == 1 else "occurrences"
+            self._set_status(f"Renamed {count} {noun}.", success=True)
+
+
 class DataFrameEditor(QMainWindow):
     def __init__(self, filename=None, splash=None, splash_label=None, splash_img=None):
         super().__init__()
@@ -439,6 +832,10 @@ class DataFrameEditor(QMainWindow):
 
         # Track file modifications
         self.file_modified = False
+
+        # Modeless dialogs — created once, re-raised on subsequent calls
+        self._find_dialog = None
+        self._rename_dialog = None
 
         # Create status bar
         self.status_bar = self.statusBar()
@@ -754,6 +1151,19 @@ class DataFrameEditor(QMainWindow):
 
         # All row actions start disabled until a row is selected
         self._set_edit_row_actions_enabled(False)
+
+        edit_menu.addSeparator()
+
+        edit_find_action = QAction("&Find...", self)
+        edit_find_action.setShortcut("Ctrl+F")
+        edit_find_action.triggered.connect(self.show_find_dialog)
+        edit_menu.addAction(edit_find_action)
+
+        self.edit_rename_action = QAction("&Rename...", self)
+        self.edit_rename_action.setShortcut("Ctrl+R")
+        self.edit_rename_action.triggered.connect(self.show_rename_dialog)
+        self.edit_rename_action.setEnabled(False)  # Enabled once a file is loaded
+        edit_menu.addAction(self.edit_rename_action)
 
         view_menu = menu_bar.addMenu("&View")
         self.view_plot_action = QAction("&Plot", self)
@@ -1518,6 +1928,183 @@ class DataFrameEditor(QMainWindow):
         self.processNameDelegate.setCompleterStrings(processname_list)
         debugging.leave()
 
+    # -------------------------------------------------------------------------
+    # Find / Rename dialogs
+    # -------------------------------------------------------------------------
+
+    def show_find_dialog(self):
+        """Open (or raise) the modeless Find dialog."""
+        if self._find_dialog is None:
+            self._find_dialog = FindDialog(self)
+        self._find_dialog.show()
+        self._find_dialog.raise_()
+        self._find_dialog.activateWindow()
+        self._find_dialog.find_edit.setFocus()
+
+    def show_rename_dialog(self):
+        """Open (or raise) the modeless Rename dialog."""
+        if self._rename_dialog is None:
+            self._rename_dialog = RenameDialog(self)
+        self._rename_dialog.show()
+        self._rename_dialog.raise_()
+        self._rename_dialog.activateWindow()
+        self._rename_dialog.from_edit.setFocus()
+
+    def _build_rename_pattern(self, from_text, mode):
+        """Return (formula_pattern, from_proc, from_task) for the given mode.
+
+        formula_pattern -- compiled re for matching in Start-ƒ / End-ƒ cells
+        from_proc       -- process portion of from_text ('' for :Task style)
+        from_task       -- task portion of from_text (None for process mode)
+        """
+        if mode == 'process':
+            pattern = re.compile(r'\b' + re.escape(from_text) + r'(?=:)')
+            return pattern, None, None
+        else:
+            colon_pos = from_text.index(':')
+            from_proc = from_text[:colon_pos]
+            from_task = from_text[colon_pos + 1:]
+            if from_proc:
+                pattern = re.compile(
+                    r'\b' + re.escape(from_proc) + r':' + re.escape(from_task) + r'\b'
+                )
+            else:
+                pattern = re.compile(
+                    r'(?<![A-Za-z0-9_]):' + re.escape(from_task) + r'\b'
+                )
+            return pattern, from_proc, from_task
+
+    def collect_rename_changes(self, from_text, to_text, mode):
+        """Dry-run: return a list of (line_no, before_label, after_label) tuples
+        describing every cell that would be changed by do_rename_all().
+
+        line_no      -- 1-based row number as shown in the table
+        before_label -- e.g. 'X_Axis:X_Move'  or
+                              'X_Axis:X_Move.Start-f: Start(X_Axis:X_Move)+0.1'
+        after_label  -- same structure with substitution applied
+        """
+        debugging.enter(f'from_text={from_text!r}, to_text={to_text!r}, mode={mode}')
+        changes = []
+        formula_pattern, from_proc, from_task = self._build_rename_pattern(from_text, mode)
+
+        if mode == 'process':
+            for row_index in range(self.dataframe.shape[0]):
+                line_no = row_index + 1
+                proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
+                task_val = str(self.dataframe.iloc[row_index][TASK_NAME_HDR])
+                pt_before = f'{proc_val}:{task_val}'
+
+                # Process column change
+                if proc_val == from_text:
+                    pt_after = f'{to_text}:{task_val}'
+                    changes.append((line_no, pt_before, pt_after))
+
+                # Formula column changes
+                for formula_col, col_label in (
+                    (START_TIME_FORMULA_HDR, 'Start-f'),
+                    (END_TIME_FORMULA_HDR,   'End-f'),
+                ):
+                    formula_val = str(self.dataframe.iloc[row_index][formula_col])
+                    new_formula, n = formula_pattern.subn(to_text, formula_val)
+                    if n > 0:
+                        before_label = f'{pt_before}.{col_label}: {formula_val}'
+                        after_label  = f'{pt_before}.{col_label}: {new_formula}'
+                        changes.append((line_no, before_label, after_label))
+
+        else:  # mode == 'process_task'
+            colon_pos_to = to_text.index(':')
+            to_proc = to_text[:colon_pos_to]
+            to_task = to_text[colon_pos_to + 1:]
+            repl = to_text if from_proc else f':{to_task}'
+
+            for row_index in range(self.dataframe.shape[0]):
+                line_no = row_index + 1
+                proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
+                task_val = str(self.dataframe.iloc[row_index][TASK_NAME_HDR])
+                pt_before = f'{proc_val}:{task_val}'
+
+                # Definition row: Process and/or Task cell changes
+                if proc_val == from_proc and task_val == from_task:
+                    new_proc = to_proc if from_proc != to_proc else proc_val
+                    new_task = to_task if from_task != to_task else task_val
+                    pt_after = f'{new_proc}:{new_task}'
+                    if pt_before != pt_after:
+                        changes.append((line_no, pt_before, pt_after))
+
+                # Formula column changes (all rows)
+                for formula_col, col_label in (
+                    (START_TIME_FORMULA_HDR, 'Start-f'),
+                    (END_TIME_FORMULA_HDR,   'End-f'),
+                ):
+                    formula_val = str(self.dataframe.iloc[row_index][formula_col])
+                    new_formula, n = formula_pattern.subn(repl, formula_val)
+                    if n > 0:
+                        before_label = f'{pt_before}.{col_label}: {formula_val}'
+                        after_label  = f'{pt_before}.{col_label}: {new_formula}'
+                        changes.append((line_no, before_label, after_label))
+
+        debugging.leave(f'len(changes)={len(changes)}')
+        return changes
+
+    def do_rename_all(self, from_text, to_text, mode):
+        """Atomically rename a Process Name or Process:Task Name across the file.
+
+        Operates directly on self.dataframe, then calls apply_rules_and_populate_model()
+        for a single clean rebuild.  Returns the total number of cell-level changes made.
+        """
+        debugging.enter(f'from_text={from_text!r}, to_text={to_text!r}, mode={mode}')
+
+        count = 0
+        formula_pattern, from_proc, from_task = self._build_rename_pattern(from_text, mode)
+
+        if mode == 'process':
+            for row_index in range(self.dataframe.shape[0]):
+                proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
+                if proc_val == from_text:
+                    self.dataframe.iloc[row_index, column_index(PROCESS_NAME_HDR)] = to_text
+                    count += 1
+                for formula_col in (START_TIME_FORMULA_HDR, END_TIME_FORMULA_HDR):
+                    formula_val = str(self.dataframe.iloc[row_index][formula_col])
+                    new_formula, n = formula_pattern.subn(to_text, formula_val)
+                    if n > 0:
+                        self.dataframe.iloc[row_index, column_index(formula_col)] = new_formula
+                        count += n
+
+        else:  # mode == 'process_task'
+            colon_pos_to = to_text.index(':')
+            to_proc = to_text[:colon_pos_to]
+            to_task = to_text[colon_pos_to + 1:]
+            repl = to_text if from_proc else f':{to_task}'
+
+            for row_index in range(self.dataframe.shape[0]):
+                proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
+                task_val = str(self.dataframe.iloc[row_index][TASK_NAME_HDR])
+
+                if proc_val == from_proc and task_val == from_task:
+                    if from_task != to_task:
+                        self.dataframe.iloc[row_index, column_index(TASK_NAME_HDR)] = to_task
+                        count += 1
+                    if from_proc != to_proc:
+                        self.dataframe.iloc[row_index, column_index(PROCESS_NAME_HDR)] = to_proc
+                        count += 1
+
+                for formula_col in (START_TIME_FORMULA_HDR, END_TIME_FORMULA_HDR):
+                    formula_val = str(self.dataframe.iloc[row_index][formula_col])
+                    new_formula, n = formula_pattern.subn(repl, formula_val)
+                    if n > 0:
+                        self.dataframe.iloc[row_index, column_index(formula_col)] = new_formula
+                        count += n
+
+        if count > 0:
+            self.apply_rules_and_populate_model()
+            self.set_fixed_column_widths()
+            self.resize(self.suggested_window_width, self.suggested_window_height)
+            self.set_file_modified(True)
+            self.update_status_bar("Ready")
+
+        debugging.leave(f'count={count}')
+        return count
+
     def calculate_formula(self, formula):
         debugging.enter()
         value = "ERR:"
@@ -1559,6 +2146,9 @@ class DataFrameEditor(QMainWindow):
         QApplication.restoreOverrideCursor()
         
         self.update_processname_completer()
+        # Enable Rename once a file/data is loaded
+        if hasattr(self, 'edit_rename_action'):
+            self.edit_rename_action.setEnabled(True)
         debugging.leave()
 
     def build_dependency_graph(self):
