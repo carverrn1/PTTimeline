@@ -444,8 +444,14 @@ CONFIG_ANNOTATIONS_MARKERS_FONTSTYLE_CHOICES    = ['Normal', 'Bold', 'Italic', '
 # Runtime config dict — populated by load_ini() at startup
 config = {}
 
+# Recent files managers — populated in __main__ after INI path is known
+recent_files_pttd: 'RecentFiles | None' = None   # File menu  (.pttd)
+recent_files_pttp: 'RecentFiles | None' = None   # Presentation menu (.pttp)
 
-from ptt_config import load_plot_config, _apply_ini_config, _make_parser
+RECENT_FILES_MAX = 15
+
+from ptt_config import load_plot_config, _apply_ini_config, _make_parser, get_user_ini_path
+from ptt_recent_files import RecentFiles
 from ptt_debugging import Debugging, CrashLogger
 debugging_enabled = False
 debugging_filename = None
@@ -1470,7 +1476,10 @@ class MainWindow(QMainWindow):
         file_open_action = QAction('&Open', self)
         file_open_action.triggered.connect(self.file_open_dialog)
         file_menu.addAction(file_open_action)
-        
+
+        self.file_open_recent_menu = file_menu.addMenu('Open &Recent')
+        self.file_open_recent_menu.aboutToShow.connect(self._rebuild_recent_pttd_menu)
+
         file_save_menu = file_menu.addMenu('&Save')
 
         for fmt, label, ext, file_filter in [
@@ -1499,6 +1508,10 @@ class MainWindow(QMainWindow):
         self.presentation_open_action.triggered.connect(self.presentation_open_dialog)
         self.presentation_open_action.setEnabled(False)
         presentation_menu.addAction(self.presentation_open_action)
+
+        self.presentation_open_recent_menu = presentation_menu.addMenu('Open &Recent')
+        self.presentation_open_recent_menu.aboutToShow.connect(self._rebuild_recent_pttp_menu)
+        self.presentation_open_recent_menu.setEnabled(False)
 
         self.presentation_save_action = QAction('&Save...', self)
         self.presentation_save_action.triggered.connect(self.presentation_save_dialog)
@@ -2018,6 +2031,7 @@ class MainWindow(QMainWindow):
         self.presentation_open_action.setEnabled(True)
         self.presentation_save_action.setEnabled(True)
         self.presentation_process_attributes_action.setEnabled(True)
+        self.presentation_open_recent_menu.setEnabled(True)
 
         # Refresh menu states to reflect new configuration
         self.refresh_menu_states()
@@ -2028,6 +2042,12 @@ class MainWindow(QMainWindow):
 
         # File loaded successfully — enable file monitoring
         self.file_monitoring_enabled = True
+
+        # Update recent files lists
+        if recent_files_pttd is not None and self.pttd_file_name:
+            recent_files_pttd.add(self.pttd_file_name)
+        if recent_files_pttp is not None and self.pttp_file_name:
+            recent_files_pttp.add(self.pttp_file_name)
 
         debugging.leave()
         
@@ -2072,11 +2092,64 @@ class MainWindow(QMainWindow):
         debugging.print("Menu states refreshed to match current configuration")
         debugging.leave()
     
+    def _rebuild_recent_pttd_menu(self):
+        """Repopulate the File → Open Recent submenu just before it is shown."""
+        if recent_files_pttd is None:
+            return
+        self.file_open_recent_menu.clear()
+        new_menu = recent_files_pttd.build_menu(self, self._open_recent_pttd)
+        for action in new_menu.actions():
+            self.file_open_recent_menu.addAction(action)
+
+    def _rebuild_recent_pttp_menu(self):
+        """Repopulate the Presentation → Open Recent submenu just before it is shown."""
+        if recent_files_pttp is None:
+            return
+        self.presentation_open_recent_menu.clear()
+        new_menu = recent_files_pttp.build_menu(self, self._open_recent_pttp)
+        for action in new_menu.actions():
+            self.presentation_open_recent_menu.addAction(action)
+
+    def _open_recent_pttd(self, file_path: str):
+        """Open a .pttd file chosen from the File → Open Recent submenu."""
+        debugging.enter(f'file_path={file_path}')
+        if not os.path.isfile(file_path):
+            QMessageBox.warning(self, 'File Not Found',
+                f'The file no longer exists:\n{file_path}')
+            debugging.leave('File not found')
+            return
+        try:
+            self.file_name = file_path
+            self.load_and_plot(self.file_name)
+            self.setup_file_watcher()
+        except Exception as e:
+            self.file_name = None
+            QMessageBox.critical(self, 'Error',
+                f'An error occurred while reading the file: {e}')
+        debugging.leave()
+
+    def _open_recent_pttp(self, file_path: str):
+        """Open a .pttp file chosen from the Presentation → Open Recent submenu."""
+        debugging.enter(f'file_path={file_path}')
+        if not os.path.isfile(file_path):
+            QMessageBox.warning(self, 'File Not Found',
+                f'The file no longer exists:\n{file_path}')
+            debugging.leave('File not found')
+            return
+        try:
+            self.load_and_plot(file_path)
+            self.setup_file_watcher()
+        except Exception as e:
+            QMessageBox.critical(self, 'Error',
+                f'An error occurred loading the presentation: {e}')
+        debugging.leave()
+
     def file_open_dialog(self):
         debugging.enter()
         while True:
             file_name, _ = QFileDialog.getOpenFileName(
-                self, "Open PTTimeline File", "",
+                self, "Open PTTimeline File",
+                recent_files_pttd.get_dialog_dir() if recent_files_pttd else "",
                 "PTTimeline Data Files (*.pttd)")
             if not file_name:
                 break  # user cancelled
@@ -3026,6 +3099,19 @@ if __name__ == "__main__":
     filename = parse_command_line_args()
     
     load_ini()
+
+    # Initialize recent files managers (INI path is now guaranteed to exist)
+    _pttplot_ini_path = get_user_ini_path(f'{PROGRAM_FILENAME}.ini')
+    recent_files_pttd = RecentFiles(
+        _pttplot_ini_path,
+        section='RECENT_FILES_PTTD',
+        max_entries=RECENT_FILES_MAX,
+    )
+    recent_files_pttp = RecentFiles(
+        _pttplot_ini_path,
+        section='RECENT_FILES_PTTP',
+        max_entries=RECENT_FILES_MAX,
+    )
     
     debugging_enabled = config['DEBUGGING']['enabled_bool']
     debugging_filename = config['DEBUGGING']['filename']

@@ -73,6 +73,27 @@ PACKAGE_NAME    = APP_PACKAGE
 from platformdirs import user_config_dir, user_log_dir
 USER_LOG_PATH = user_log_dir(PACKAGE_NAME, APP_COMPANY)
 from ptt_debugging import CrashLogger
+from ptt_config import load_view_config, get_user_ini_path
+from ptt_recent_files import RecentFiles
+
+DEFAULT_CONFIG = """\
+[META]
+; DO NOT EDIT THIS SECTION! [META] is maintained by the program
+app_package=PTTimeline
+app_name=PTTView
+app_version=0.0.0
+ini_version=1
+
+[DEBUGGING]
+enabled_bool=False
+filename=pttview.dbg
+"""
+
+RECENT_FILES_MAX = 15
+
+# Runtime objects — populated in __main__
+config: dict = {}
+recent_files: 'RecentFiles | None' = None
 
 window_icon_path = os.path.join(_RES_DIR, f"{PACKAGE_NAME}.ico")
 program_icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
@@ -666,6 +687,9 @@ class ImageViewer(QMainWindow):
         open_action.triggered.connect(self.open_file_dialog)
         file_menu.addAction(open_action)
 
+        self.file_open_recent_menu = file_menu.addMenu("Open &Recent")
+        self.file_open_recent_menu.aboutToShow.connect(self._rebuild_recent_menu)
+
         file_menu.addSeparator()
 
         exit_action = QAction("E&xit", self)
@@ -807,6 +831,10 @@ class ImageViewer(QMainWindow):
             
             self.status_bar.showMessage(f"Loaded: {os.path.basename(self.image_file)} | Press F1 for help")
             self.update_zoom_label()
+
+            # Update recent files list
+            if recent_files is not None:
+                recent_files.add(self.image_file)
             
         except Exception as e:
             QMessageBox.critical(self, "Error Loading Image", 
@@ -929,6 +957,23 @@ class ImageViewer(QMainWindow):
             navigator = NavigatorDialog(self.image_widget, self.scroll_area, self)
             navigator.exec()
             
+    def _rebuild_recent_menu(self):
+        """Repopulate the Open Recent submenu just before it is shown."""
+        if recent_files is None:
+            return
+        self.file_open_recent_menu.clear()
+        new_menu = recent_files.build_menu(self, self._open_recent_file)
+        for action in new_menu.actions():
+            self.file_open_recent_menu.addAction(action)
+
+    def _open_recent_file(self, file_path: str):
+        """Open a file chosen from the Open Recent submenu."""
+        if not os.path.isfile(file_path):
+            QMessageBox.warning(self, 'File Not Found',
+                f'The file no longer exists:\n{file_path}')
+            return
+        self.load_new_image(file_path)
+
     def open_file_dialog(self):
         """Show file dialog to open a new image file"""
         # Create file filter for supported formats
@@ -946,7 +991,7 @@ class ImageViewer(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open Image File",
-            "",
+            recent_files.get_dialog_dir() if recent_files else "",
             file_filter
         )
         
@@ -989,6 +1034,10 @@ class ImageViewer(QMainWindow):
             # Update status
             self.status_bar.showMessage(f"Loaded: {os.path.basename(file_path)} | Press F1 for help")
             self.update_zoom_label()
+
+            # Update recent files list
+            if recent_files is not None:
+                recent_files.add(file_path)
             
         except Exception as e:
             QMessageBox.critical(self, "Error Loading Image", 
@@ -1413,5 +1462,13 @@ if __name__ == "__main__":
 
     # Parse and validate command line arguments FIRST - before any other initialization
     filename = parse_command_line_args()
-    
+
+    # Load User Config/INI file and initialize recent files manager
+    config = load_view_config(f'{PROGRAM_FILENAME}.ini', DEFAULT_CONFIG, PROGRAM_NAME)
+    recent_files = RecentFiles(
+        get_user_ini_path(f'{PROGRAM_FILENAME}.ini'),
+        section='RECENT_FILES',
+        max_entries=RECENT_FILES_MAX,
+    )
+
     main(filename, splash=_splash, splash_label=_splash_label, splash_img=_splash_img)

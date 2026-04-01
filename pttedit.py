@@ -69,6 +69,7 @@ from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QFont, QAct
 QT_ROLES = ['Qt.DisplayRole','Qt.DecorationRole','Qt.EditRole','Qt.ToolTipRole','Qt.StatusTipRole','Qt.WhatsThisRole','Qt.SizeHintRole']
 
 config = {}
+recent_files: 'RecentFiles | None' = None  # Initialized in main() after INI path is known
 
 TIME_UNIT_OPTIONS = ['', 'ns', 'µs', 'ms', 's', 'min', 'hr', 'days']
 
@@ -90,10 +91,13 @@ plotter_py=pttplot.py
 plotter_exe=pttplot.exe
 """
 
+RECENT_FILES_MAX = 15
 
 
 
-from ptt_config import load_edit_config
+
+from ptt_config import load_edit_config, get_user_ini_path
+from ptt_recent_files import RecentFiles
 from ptt_debugging import Debugging, CrashLogger
 debugging_enabled = False
 debugging_filename = None
@@ -451,6 +455,62 @@ class DataFrameEditor(QMainWindow):
 
         debugging.leave()
         
+    def _rebuild_recent_menu(self):
+        """Repopulate the Open Recent submenu just before it is shown."""
+        if recent_files is None:
+            return
+        self.file_open_recent_menu.clear()
+        new_menu = recent_files.build_menu(self, self._open_recent_file)
+        for action in new_menu.actions():
+            self.file_open_recent_menu.addAction(action)
+
+    def _open_recent_file(self, file_path: str):
+        """Open a file chosen from the Open Recent submenu."""
+        debugging.enter(f'file_path={file_path}')
+        if not self.check_unsaved_changes():
+            debugging.leave('Cancelled by user')
+            return
+        if not os.path.isfile(file_path):
+            QMessageBox.warning(self, 'File Not Found',
+                f'The file no longer exists:\n{file_path}')
+            debugging.leave('File not found')
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.setWindowTitle(f'Opening {os.path.basename(file_path)}...')
+        self.update_status_bar('Loading file...')
+        QApplication.processEvents()
+        try:
+            self.workingFilename = file_path
+            self.file_export_csv_action.setEnabled(True)
+            self.file_export_ods_action.setEnabled(True)
+            self.file_export_puml_action.setEnabled(True)
+            self.dependency_graph = {}
+            self.recalc_order = []
+            with open(self.workingFilename, 'r') as json_file:
+                config_dataframe_dict = json.load(json_file)
+            raw_metadata = config_dataframe_dict.get('file_metadata', {})
+            self.file_metadata = {'time_unit': str(raw_metadata.get('time_unit', ''))}
+            self._set_time_unit_combo(self.file_metadata['time_unit'])
+            self.dataframe = pd.DataFrame.from_dict(
+                config_dataframe_dict['dataframe'], orient='index')
+            self.dataframe.index = self.dataframe.index.astype(int)
+            self.dataframe = self.dataframe.fillna('')
+            self.apply_rules_and_populate_model()
+            self.setWindowTitle(f'{PROGRAM_NAME} - {file_path}')
+            self.set_file_modified(False)
+            if recent_files is not None:
+                recent_files.add(file_path)
+        except Exception as e:
+            debugging.print(f'ERROR: {e}')
+            QMessageBox.critical(self, f'Error Opening File',
+                f'File: {file_path}\nException: {e}')
+            self.setWindowTitle(f'{PROGRAM_NAME}')
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.set_fixed_column_widths()
+        self.resize(self.suggested_window_width, self.suggested_window_height)
+        debugging.leave()
+
     def set_fixed_column_widths(self):
         debugging.enter()
         header = self.table_view.horizontalHeader()
@@ -619,6 +679,8 @@ class DataFrameEditor(QMainWindow):
         file_open_pttd_action = QAction("&Open", self)
         file_open_pttd_action.triggered.connect(self.open_timeline_from_pttd)
         file_menu.addAction(file_open_pttd_action)
+        self.file_open_recent_menu = file_menu.addMenu("Open &Recent")
+        self.file_open_recent_menu.aboutToShow.connect(self._rebuild_recent_menu)
         file_save_action = QAction("&Save", self)
         file_save_action.setShortcut(QKeySequence.Save)  # Ctrl+S
         file_save_action.triggered.connect(self.save_timeline_file)
@@ -1307,7 +1369,7 @@ class DataFrameEditor(QMainWindow):
         self.setWindowTitle(f"Open File...")
         QApplication.processEvents()  # Update UI immediately
         
-        filename, _ = QFileDialog.getOpenFileName(self, f"Open {DATA_FILE_EXTENSION.upper()} File", "", f"{DATA_FILE_EXTENSION.upper()} Files (*.{DATA_FILE_EXTENSION})")
+        filename, _ = QFileDialog.getOpenFileName(self, f"Open {DATA_FILE_EXTENSION.upper()} File", recent_files.get_dialog_dir() if recent_files else "", f"{DATA_FILE_EXTENSION.upper()} Files (*.{DATA_FILE_EXTENSION})")
         
         if filename:
             # Show busy cursor and status
@@ -1353,6 +1415,8 @@ class DataFrameEditor(QMainWindow):
                 # Update window title with filename
                 self.setWindowTitle(f"{PROGRAM_NAME} - {filename}")
                 self.set_file_modified(False)  # File just loaded, not modified
+                if recent_files is not None:
+                    recent_files.add(filename)
                 
             except Exception as e:
                 debugging.print(f'ERROR: {DATA_FILE_EXTENSION.upper()} File: {filename}, e={e}')
@@ -1402,6 +1466,8 @@ class DataFrameEditor(QMainWindow):
             # Update window title with filename
             self.setWindowTitle(f"{PROGRAM_NAME} - {filename}")
             self.set_file_modified(False)  # File just loaded, not modified
+            if recent_files is not None:
+                recent_files.add(filename)
             
         except Exception as e:
             debugging.print(f'ERROR: {DATA_FILE_EXTENSION.upper()} File: {filename}, e={e}')
@@ -2005,6 +2071,8 @@ class DataFrameEditor(QMainWindow):
                 # set_file_modified(False) is called inside save_timeline_to_pttd,
                 # which also sets the window title correctly — no manual fixup needed here
                 self.update_status_bar("Ready")
+                if recent_files is not None:
+                    recent_files.add(filename)
                 
             except Exception as e:
                 debugging.print(f'ERROR: Saving File: {filename}, e={e}')
@@ -2744,6 +2812,13 @@ if __name__ == "__main__":
 
     # Load User Config/INI file. Handles setup of default and merging if user config is missing entries.
     config = load_edit_config(f'{PROGRAM_FILENAME}.ini', DEFAULT_CONFIG, PROGRAM_NAME)
+
+    # Initialize recent files manager (INI path is now guaranteed to exist)
+    recent_files = RecentFiles(
+        get_user_ini_path(f'{PROGRAM_FILENAME}.ini'),
+        section='RECENT_FILES',
+        max_entries=RECENT_FILES_MAX,
+    )
 
     debugging_enabled = config['DEBUGGING']['enabled_bool']
     debugging_filename = config['DEBUGGING']['filename']
