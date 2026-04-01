@@ -20,6 +20,10 @@ if exist "%target_folder%" (
 echo Creating fresh folder: %target_folder%
 mkdir "%target_folder%"
 
+:: Update PTTimeline_Issues.md (markdown) for Claude
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File ".\make_issues_markdown.ps1"
+copy PTTimeline_Issues.md "%target_folder%"
+
 :: Support Files
 copy Claude_Project_Files.bat "%target_folder%"
 copy DECISIONS.md "%target_folder%"
@@ -31,13 +35,7 @@ copy requirements.txt "%target_folder%"
 copy pttedit.py "%target_folder%"
 copy pttplot.py "%target_folder%"
 copy pttview.py "%target_folder%"
-copy "lib\pttedit_delegates.py" "%target_folder%"
-copy "lib\pttedit_expression_evaluator.py" "%target_folder%"
-copy "lib\ptt_config.py" "%target_folder%"
-copy "lib\ptt_appinfo.py" "%target_folder%"
-copy "lib\ptt_debugging.py" "%target_folder%"
-copy "lib\ptt_splash.py" "%target_folder%"
-copy "lib\ptt_utils.py" "%target_folder%"
+copy "lib\*.py" "%target_folder%"
 
 REM copy resources\*.ico "%target_folder%"
 
@@ -62,7 +60,8 @@ copy PTTimeline.iss "%target_folder%"
 copy license.txt "%target_folder%"
 
 :: Cleanup unwanted files
-del "%target_folder%"\*.bak
+del "%target_folder%"\*.bak*
+del "%target_folder%"\lib\*.bak*
 
 
 :: Open the folder
