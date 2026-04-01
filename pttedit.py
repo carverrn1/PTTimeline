@@ -41,6 +41,7 @@ USER_CONFIG_PATH = user_config_dir(PACKAGE_NAME, APP_COMPANY)
 USER_LOG_PATH = user_log_dir(PACKAGE_NAME, APP_COMPANY)
 
 import re
+import html
 
 from collections import OrderedDict
 
@@ -394,6 +395,8 @@ class FindDialog(QDialog):
         self.setWindowTitle("Find")
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
+        self._find_all_dialog = None  # created once on first Find All
+
         # --- Find field ---
         find_label = QLabel("Find what:")
         self.find_edit = QLineEdit()
@@ -421,10 +424,14 @@ class FindDialog(QDialog):
         self.find_prev_btn = QPushButton("Find Previous")
         self.find_prev_btn.clicked.connect(self.find_prev)
 
+        find_all_btn = QPushButton("Find All")
+        find_all_btn.clicked.connect(self.find_all)
+
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.close)
 
         btn_layout = QHBoxLayout()
+        btn_layout.addWidget(find_all_btn)
         btn_layout.addStretch()
         btn_layout.addWidget(self.find_prev_btn)
         btn_layout.addWidget(self.find_next_btn)
@@ -442,6 +449,22 @@ class FindDialog(QDialog):
         layout.addLayout(btn_layout)
 
         self.find_edit.textChanged.connect(self._clear_status)
+
+    def find_all(self):
+        """Open (or refresh) the modeless Find All results window."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        if self._find_all_dialog is None:
+            self._find_all_dialog = FindAllDialog(self)
+        self._find_all_dialog.refresh()
+        self._find_all_dialog.show()
+        self._find_all_dialog.raise_()
+        self._find_all_dialog.activateWindow()
 
     def _clear_status(self):
         self.status_label.setText("")
@@ -533,6 +556,147 @@ class FindDialog(QDialog):
         # Wrap around to last match
         self._navigate_to(*matches[-1])
         self._set_status(f"Wrapped. Match {len(matches)} of {len(matches)}")
+
+
+class FindAllDialog(QDialog):
+    """Modeless Find All results window for PTTEdit.
+
+    Displays all cells matching the current Find search term, with the
+    matched text highlighted in yellow.  Clicking a result navigates the
+    table to that cell.  A Refresh button re-runs the search.
+    """
+
+    MATCH_HIGHLIGHT = '#FFFF00'
+
+    # Column labels matching Rename preview style
+    COL_LABELS = {
+        column_index(PROCESS_NAME_HDR):       None,         # shown as part of P:T identity
+        column_index(TASK_NAME_HDR):          None,         # shown as part of P:T identity
+        column_index(START_TIME_FORMULA_HDR): 'Start-f',
+        column_index(END_TIME_FORMULA_HDR):   'End-f',
+    }
+
+    def __init__(self, find_dialog):
+        super().__init__(find_dialog, Qt.Tool)
+        self.find_dialog = find_dialog
+        self.window      = find_dialog.window
+        self.setWindowTitle("Find All Results")
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowMaximizeButtonHint
+            | Qt.WindowStaysOnTopHint
+        )
+        self.setMinimumSize(600, 400)
+
+        # Parallel list: one entry per displayed result line → (row, col)
+        self._result_map = []
+
+        # --- Scrollable HTML text area ---
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.mousePressEvent = self._on_click
+
+        # --- Summary label ---
+        self.summary_label = QLabel("")
+        self.summary_label.setStyleSheet("font-weight: bold;")
+
+        # --- Buttons ---
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self.refresh)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(refresh_btn)
+        btn_layout.addWidget(close_btn)
+
+        # --- Top-level layout ---
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.summary_label)
+        layout.addWidget(self.text_edit)
+        layout.addLayout(btn_layout)
+
+    def _build_label(self, row, col, cell_text):
+        """Return the plain-text label for a result entry.
+
+        Format mirrors the Rename preview:
+          Process:Task                     (for Process or Task column hits)
+          Process:Task.Start-f: <formula>  (for formula column hits)
+        """
+        model = self.window.model
+        proc = model.item(row, column_index(PROCESS_NAME_HDR)).text()
+        task = model.item(row, column_index(TASK_NAME_HDR)).text()
+        pt   = f'{proc}:{task}'
+        col_label = self.COL_LABELS.get(col)
+        if col_label:
+            return f'{pt}.{col_label}: {cell_text}'
+        else:
+            return pt
+
+    def _highlight_html(self, label, search_text, case_sensitive):
+        """Return an HTML string with all occurrences of search_text in label
+        wrapped in a yellow highlight span.  Other text is HTML-escaped.
+        """
+        escaped_label  = html.escape(label)
+        escaped_search = html.escape(search_text)
+        flags = 0 if case_sensitive else re.IGNORECASE
+        pattern = re.compile(re.escape(escaped_search), flags)
+        highlighted = pattern.sub(
+            lambda m: (
+                f'<span style="background-color:{self.MATCH_HIGHLIGHT};">'
+                f'{m.group(0)}</span>'
+            ),
+            escaped_label
+        )
+        return highlighted
+
+    def refresh(self):
+        """Re-run the search and repopulate the results window."""
+        search_text    = self.find_dialog.find_edit.text()
+        case_sensitive = self.find_dialog.case_checkbox.isChecked()
+        matches        = self.find_dialog._get_all_matches()
+
+        self._result_map = []
+
+        if not search_text:
+            self.summary_label.setText("No search term entered.")
+            self.text_edit.setHtml("")
+            return
+
+        if not matches:
+            self.summary_label.setText(f'"{search_text}" \u2014 not found.')
+            self.text_edit.setHtml("")
+            return
+
+        model = self.window.model
+        html_lines = []
+        for row, col in matches:
+            item      = model.item(row, col)
+            cell_text = item.text() if item else ""
+            line_no   = row + 1
+            label     = self._build_label(row, col, cell_text)
+            body      = self._highlight_html(label, search_text, case_sensitive)
+            html_lines.append(
+                f'<div style="font-family:\'Courier New\',monospace; white-space:pre;">'
+                f'<b>{line_no}:</b> {body}</div>'
+            )
+            self._result_map.append((row, col))
+
+        noun = "match" if len(matches) == 1 else "matches"
+        self.summary_label.setText(f'{len(matches)} {noun} for "{search_text}"')
+        self.text_edit.setHtml(''.join(html_lines))
+
+    def _on_click(self, event):
+        """Map a mouse click in the text area to a table navigation."""
+        # Let QTextEdit handle the event first (moves the cursor)
+        QTextEdit.mousePressEvent(self.text_edit, event)
+        block_number = self.text_edit.textCursor().blockNumber()
+        if 0 <= block_number < len(self._result_map):
+            row, col = self._result_map[block_number]
+            self.find_dialog._navigate_to(row, col)
+            self.window.raise_()
 
 
 class RenamePreviewDialog(QDialog):
