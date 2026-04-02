@@ -3,11 +3,11 @@
 ; Applications: PTTEdit, PTTPlot, PTTView
 ; Publisher:    RNCSoftware
 ; Author:       Richard Carver
-; Version:      0.5.0.4-dev
+; Version:      0.5.0.8-dev
 
 #define AppName        "PTTimeline"
-#define AppVersion     "0.5.0.4-dev"
-#define AppVerName     "PTTimeline 0.5.0.4-dev"
+#define AppVersion     "0.5.0.8-dev"
+#define AppVerName     "PTTimeline 0.5.0.8-dev"
 #define AppPublisher   "RNCSoftware"
 #define AppAuthor      "Richard Carver"
 #define AppCopyright   "Copyright (C) 2026 Richard Carver"
@@ -30,7 +30,7 @@ DefaultDirName           ={commonpf}\{#AppPublisher}\{#AppName}
 DefaultGroupName         ={#AppName}
 DisableProgramGroupPage  =no
 OutputDir                =installer
-OutputBaseFilename       =PTTimeline-0.5.0.4-dev-setup
+OutputBaseFilename       =PTTimeline-0.5.0.8-dev-setup
 SetupIconFile            ={#ResourcesDir}\PTTimeline.ico
 LicenseFile              =license.txt
 Compression              =lzma2/ultra64
@@ -111,8 +111,9 @@ Name: "{commondesktop}\PTTPlot";  Filename: "{app}\pttplot.exe"; IconFilename: "
 Name: "{commondesktop}\PTTView";  Filename: "{app}\pttview.exe"; IconFilename: "{app}\resources\pttview.ico"; Comment: "Process-Task Timeline v{#AppVersion} Viewer";  Tasks: desktopicons
 ; -----------------------------------------------------------------------------
 ; Temporary desktop shortcut for uninstaller during development only
+; TODO: Remove this entry before v1.0 release (end users use Start Menu or Settings > Apps)
 ; -----------------------------------------------------------------------------
-Name: "{userdesktop}\PTTimeline v{#AppVersion} Uninstall"; Filename: "{uninstallexe}"; IconFilename: "{app}\resources\PTTimeline.ico"; Comment: "Process-Task Timeline v{#AppVersion} Uninstall";  Tasks: desktopicons
+Name: "{commondesktop}\PTTimeline v{#AppVersion} Uninstall"; Filename: "{uninstallexe}"; IconFilename: "{app}\resources\PTTimeline.ico"; Comment: "Process-Task Timeline v{#AppVersion} Uninstall";  Tasks: desktopicons
 
 ; -----------------------------------------------------------------------------
 ; FILE ASSOCIATIONS
