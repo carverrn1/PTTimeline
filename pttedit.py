@@ -374,6 +374,64 @@ class DataFrameModel(QStandardItemModel):
         debugging.leave()
 
 
+def parse_row_selection(text, row_count):
+    """Parse a row selection string into a sorted list of 0-based row indices.
+
+    Supports:
+        "1-"        open-ended from row 1 to end
+        "5-"        open-ended from row 5 to end
+        "3-10"      closed range, inclusive (1-based)
+        "1,2,5,25"  explicit list (1-based)
+        "1-20,30,50-60"  mixed
+
+    Returns a sorted list of 0-based row indices on success.
+    Raises ValueError with a human-readable message on invalid input or
+    if any referenced row does not exist (i.e. > row_count).
+    """
+    if row_count == 0:
+        return []
+
+    indices = set()
+    # Normalise: collapse whitespace around commas and dashes
+    text = text.strip()
+    if not text:
+        raise ValueError("Row selection is empty.")
+
+    for token in text.split(','):
+        token = token.strip()
+        if not token:
+            continue
+        if '-' in token:
+            parts = token.split('-', 1)
+            start_str = parts[0].strip()
+            end_str   = parts[1].strip()
+            if not start_str.isdigit():
+                raise ValueError(f"Invalid row selection: '{token}'.")
+            start = int(start_str)
+            if end_str == '':
+                # Open-ended: from start to last row
+                end = row_count
+            elif end_str.isdigit():
+                end = int(end_str)
+            else:
+                raise ValueError(f"Invalid row selection: '{token}'.")
+            if start < 1 or end < start:
+                raise ValueError(f"Invalid row selection: '{token}'.")
+            if start > row_count or end > row_count:
+                raise ValueError("One or more rows do not exist.")
+            for r in range(start, end + 1):
+                indices.add(r - 1)   # convert to 0-based
+        else:
+            if not token.isdigit():
+                raise ValueError(f"Invalid row selection: '{token}'.")
+            r = int(token)
+            if r < 1 or r > row_count:
+                raise ValueError("One or more rows do not exist.")
+            indices.add(r - 1)   # convert to 0-based
+
+    return sorted(indices)
+
+
 class FindDialog(QDialog):
     """Modeless Find dialog for PTTEdit.
 
@@ -416,6 +474,23 @@ class FindDialog(QDialog):
         options_layout.addWidget(self.case_checkbox)
         options_layout.addStretch()
 
+        # --- Selected Rows field ---
+        rows_label = QLabel("Selected Rows:")
+        self.rows_edit = QLineEdit()
+        self.rows_edit.setMinimumWidth(280)
+        self.rows_edit.setToolTip(
+            "Rows to search. Examples:\n"
+            "  1-      row 1 to end (all rows)\n"
+            "  10-     row 10 to end\n"
+            "  3-10    rows 3 through 10\n"
+            "  1,2,5   rows 1, 2, and 5\n"
+            "  1-20,30 rows 1 through 20, and 30"
+        )
+
+        rows_layout = QHBoxLayout()
+        rows_layout.addWidget(rows_label)
+        rows_layout.addWidget(self.rows_edit)
+
         # --- Buttons ---
         self.find_next_btn = QPushButton("Find Next")
         self.find_next_btn.setDefault(True)
@@ -445,10 +520,28 @@ class FindDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addLayout(find_layout)
         layout.addLayout(options_layout)
+        layout.addLayout(rows_layout)
         layout.addWidget(self.status_label)
         layout.addLayout(btn_layout)
 
         self.find_edit.textChanged.connect(self._clear_status)
+        self.rows_edit.textChanged.connect(self._clear_status)
+
+    def _default_rows_text(self):
+        """Return the default Selected Rows string for the current table size."""
+        n = self.window.model.rowCount() if self.window.model else 0
+        return f"1-{n}" if n > 0 else "1-"
+
+    def _get_selected_rows(self):
+        """Parse the Selected Rows field and return a sorted list of 0-based indices.
+        Sets status and returns None on error.
+        """
+        row_count = self.window.model.rowCount() if self.window.model else 0
+        try:
+            return parse_row_selection(self.rows_edit.text(), row_count)
+        except ValueError as e:
+            self._set_status(str(e), error=True)
+            return None
 
     def find_all(self):
         """Open (or refresh) the modeless Find All results window."""
@@ -462,27 +555,77 @@ class FindDialog(QDialog):
         if self._find_all_dialog is None:
             self._find_all_dialog = FindAllDialog(self)
         self._find_all_dialog.refresh()
-        self._find_all_dialog.show()
-        self._find_all_dialog.raise_()
-        self._find_all_dialog.activateWindow()
+        if self._find_all_dialog.isVisible():
+            self._find_all_dialog.raise_()
+            self._find_all_dialog.activateWindow()
+        else:
+            self._find_all_dialog.show()
+            self._find_all_dialog.raise_()
+            self._find_all_dialog.activateWindow()
 
-    def _clear_status(self):
-        self.status_label.setText("")
-        self.status_label.setStyleSheet("color: gray;")
+    def find_next(self):
+        """Navigate to the next match after the current cell position."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        matches = self._get_all_matches()
+        if matches is None:
+            return   # row selection error already shown
+        if not matches:
+            self._set_status(f'"{search_text}" not found.', error=True)
+            return
+        cur_row, cur_col = self._current_position()
+        for (row, col) in matches:
+            if (row, col) > (cur_row, cur_col):
+                self._navigate_to(row, col)
+                self._set_status(f"Match {matches.index((row, col)) + 1} of {len(matches)}")
+                return
+        self._navigate_to(*matches[0])
+        self._set_status(f"Wrapped. Match 1 of {len(matches)}")
 
-    def _set_status(self, text, error=False):
-        self.status_label.setText(text)
-        self.status_label.setStyleSheet("color: red;" if error else "color: gray;")
+    def find_prev(self):
+        """Navigate to the previous match before the current cell position."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        matches = self._get_all_matches()
+        if matches is None:
+            return   # row selection error already shown
+        if not matches:
+            self._set_status(f'"{search_text}" not found.', error=True)
+            return
+        cur_row, cur_col = self._current_position()
+        for (row, col) in reversed(matches):
+            if (row, col) < (cur_row, cur_col):
+                self._navigate_to(row, col)
+                self._set_status(f"Match {matches.index((row, col)) + 1} of {len(matches)}")
+                return
+        self._navigate_to(*matches[-1])
+        self._set_status(f"Wrapped. Match {len(matches)} of {len(matches)}")
 
     def _get_all_matches(self):
-        """Return a list of (row, col) tuples for all cells matching the current search text."""
+        """Return a list of (row, col) tuples for all cells matching the current
+        search text, restricted to the rows specified in the Selected Rows field.
+        Returns None if the row selection is invalid (status already set).
+        """
         search_text = self.find_edit.text()
         if not search_text:
             return []
+        selected_rows = self._get_selected_rows()
+        if selected_rows is None:
+            return None   # validation error already shown
         case_sensitive = self.case_checkbox.isChecked()
         model = self.window.model
         matches = []
-        for row in range(model.rowCount()):
+        for row in selected_rows:
             for col in self.SEARCH_COLUMNS:
                 item = model.item(row, col)
                 if item is None:
@@ -508,6 +651,14 @@ class FindDialog(QDialog):
         if current.isValid():
             return current.row(), current.column()
         return -1, -1
+
+    def _clear_status(self):
+        self.status_label.setText("")
+        self.status_label.setStyleSheet("color: gray;")
+
+    def _set_status(self, text, error=False):
+        self.status_label.setText(text)
+        self.status_label.setStyleSheet("color: red;" if error else "color: gray;")
 
     def find_next(self):
         """Navigate to the next match after the current cell position."""
@@ -563,33 +714,39 @@ class FindAllDialog(QDialog):
 
     Displays all cells matching the current Find search term, with the
     matched text highlighted in yellow.  Clicking a result navigates the
-    table to that cell.  A Refresh button re-runs the search.
+    table to that cell and grays the selected row.  A Refresh button
+    re-runs the search.
     """
 
     MATCH_HIGHLIGHT = '#FFFF00'
+    SELECTED_BG     = '#e5e5e5'
 
     # Column labels matching Rename preview style
     COL_LABELS = {
-        column_index(PROCESS_NAME_HDR):       None,         # shown as part of P:T identity
-        column_index(TASK_NAME_HDR):          None,         # shown as part of P:T identity
+        column_index(PROCESS_NAME_HDR):       None,
+        column_index(TASK_NAME_HDR):          None,
         column_index(START_TIME_FORMULA_HDR): 'Start-f',
         column_index(END_TIME_FORMULA_HDR):   'End-f',
     }
 
     def __init__(self, find_dialog):
-        super().__init__(find_dialog, Qt.Tool)
+        super().__init__(find_dialog)
         self.find_dialog = find_dialog
         self.window      = find_dialog.window
         self.setWindowTitle("Find All Results")
         self.setWindowFlags(
             self.windowFlags()
             | Qt.WindowMaximizeButtonHint
+            | Qt.WindowMinimizeButtonHint
             | Qt.WindowStaysOnTopHint
         )
         self.setMinimumSize(600, 400)
 
         # Parallel list: one entry per displayed result line → (row, col)
-        self._result_map = []
+        self._result_map    = []
+        # Stored unselected <div> strings for efficient selection rendering
+        self._html_lines    = []
+        self._selected_block = -1
 
         # --- Scrollable HTML text area ---
         self.text_edit = QTextEdit()
@@ -619,12 +776,7 @@ class FindAllDialog(QDialog):
         layout.addLayout(btn_layout)
 
     def _build_label(self, row, col, cell_text):
-        """Return the plain-text label for a result entry.
-
-        Format mirrors the Rename preview:
-          Process:Task                     (for Process or Task column hits)
-          Process:Task.Start-f: <formula>  (for formula column hits)
-        """
+        """Return the plain-text label for a result entry."""
         model = self.window.model
         proc = model.item(row, column_index(PROCESS_NAME_HDR)).text()
         task = model.item(row, column_index(TASK_NAME_HDR)).text()
@@ -636,21 +788,34 @@ class FindAllDialog(QDialog):
             return pt
 
     def _highlight_html(self, label, search_text, case_sensitive):
-        """Return an HTML string with all occurrences of search_text in label
-        wrapped in a yellow highlight span.  Other text is HTML-escaped.
-        """
+        """Return an HTML string with all occurrences of search_text highlighted."""
         escaped_label  = html.escape(label)
         escaped_search = html.escape(search_text)
         flags = 0 if case_sensitive else re.IGNORECASE
         pattern = re.compile(re.escape(escaped_search), flags)
-        highlighted = pattern.sub(
+        return pattern.sub(
             lambda m: (
                 f'<span style="background-color:{self.MATCH_HIGHLIGHT};">'
                 f'{m.group(0)}</span>'
             ),
             escaped_label
         )
-        return highlighted
+
+    def _render_html(self):
+        """Render full HTML from self._html_lines, applying selection background."""
+        parts = []
+        for i, div in enumerate(self._html_lines):
+            if i == self._selected_block:
+                # Inject selection background into the div's style
+                selected_div = div.replace(
+                    'white-space:pre;"',
+                    f'white-space:pre; background-color:{self.SELECTED_BG};"',
+                    1
+                )
+                parts.append(selected_div)
+            else:
+                parts.append(div)
+        return ''.join(parts)
 
     def refresh(self):
         """Re-run the search and repopulate the results window."""
@@ -658,7 +823,9 @@ class FindAllDialog(QDialog):
         case_sensitive = self.find_dialog.case_checkbox.isChecked()
         matches        = self.find_dialog._get_all_matches()
 
-        self._result_map = []
+        self._result_map     = []
+        self._html_lines     = []
+        self._selected_block = -1
 
         if not search_text:
             self.summary_label.setText("No search term entered.")
@@ -671,14 +838,13 @@ class FindAllDialog(QDialog):
             return
 
         model = self.window.model
-        html_lines = []
         for row, col in matches:
             item      = model.item(row, col)
             cell_text = item.text() if item else ""
             line_no   = row + 1
             label     = self._build_label(row, col, cell_text)
             body      = self._highlight_html(label, search_text, case_sensitive)
-            html_lines.append(
+            self._html_lines.append(
                 f'<div style="font-family:\'Courier New\',monospace; white-space:pre;">'
                 f'<b>{line_no}:</b> {body}</div>'
             )
@@ -686,14 +852,15 @@ class FindAllDialog(QDialog):
 
         noun = "match" if len(matches) == 1 else "matches"
         self.summary_label.setText(f'{len(matches)} {noun} for "{search_text}"')
-        self.text_edit.setHtml(''.join(html_lines))
+        self.text_edit.setHtml(self._render_html())
 
     def _on_click(self, event):
         """Map a mouse click in the text area to a table navigation."""
-        # Let QTextEdit handle the event first (moves the cursor)
         QTextEdit.mousePressEvent(self.text_edit, event)
         block_number = self.text_edit.textCursor().blockNumber()
         if 0 <= block_number < len(self._result_map):
+            self._selected_block = block_number
+            self.text_edit.setHtml(self._render_html())
             row, col = self._result_map[block_number]
             self.find_dialog._navigate_to(row, col)
             self.window.raise_()
@@ -704,34 +871,59 @@ class RenamePreviewDialog(QDialog):
 
     Displayed by RenameDialog.preview_all() before committing the rename.
     Contains a scrollable read-only text area listing every before/after
-    change, plus a Rename All button to commit directly from the preview.
+    change with matched text highlighted, plus a Rename All button to
+    commit directly from the preview.  Clicking a result line navigates
+    the table to that row.
     """
 
-    def __init__(self, parent, changes, rename_callback):
+    FROM_HIGHLIGHT = '#FFFF00'   # yellow    — text being renamed
+    TO_HIGHLIGHT   = '#ADD8E6'   # light blue — replacement text
+    SELECTED_BG    = '#e5e5e5'
+
+    def __init__(self, parent, changes, from_text, to_text, rename_callback):
         """
         parent          -- the RenameDialog instance (modal parent)
         changes         -- list of (line_no, before_label, after_label) tuples
                            as produced by DataFrameEditor.collect_rename_changes()
+        from_text       -- literal text being renamed (highlighted yellow)
+        to_text         -- replacement text (highlighted light blue)
         rename_callback -- callable with no args; executes the actual rename
         """
         super().__init__(parent)
         self.setWindowTitle("Rename Preview")
-        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
         self.setMinimumSize(600, 400)
         self._rename_callback = rename_callback
+        self._window = parent.window
 
-        # --- Build preview text ---
-        lines = []
+        # Parallel map: HTML block number → 0-based row index for navigation.
+        # Each change produces 2 blocks (before + after); both map to same row.
+        self._result_map     = []
+        # Stored unselected <div> strings for efficient selection rendering
+        self._html_lines     = []
+        self._selected_block = -1   # first block of selected pair (-1 = none)
+
+        # --- Build highlighted HTML ---
         for line_no, before, after in changes:
-            lines.append(f"{line_no}: {before}")
-            lines.append(f"  \u2192 {after}")   # → (U+2192)
-        preview_text = '\n'.join(lines)
+            before_html = self._highlight(before, from_text, self.FROM_HIGHLIGHT)
+            after_html  = self._highlight(after,  to_text,   self.TO_HIGHLIGHT)
+            self._html_lines.append(
+                f'<div style="font-family:\'Courier New\',monospace; white-space:pre;">'
+                f'<b>{line_no}:</b> {before_html}</div>'
+            )
+            self._html_lines.append(
+                f'<div style="font-family:\'Courier New\',monospace; white-space:pre;">'
+                f'&nbsp;&nbsp;\u2192 {after_html}</div>'
+            )
+            row_index = line_no - 1
+            self._result_map.append(row_index)
+            self._result_map.append(row_index)
 
         # --- Scrollable read-only text area ---
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
-        self.text_edit.setFontFamily("Courier New")
-        self.text_edit.setPlainText(preview_text)
+        self.text_edit.setHtml(self._render_html())
+        self.text_edit.mousePressEvent = self._on_click
 
         # --- Summary label ---
         noun = "change" if len(changes) == 1 else "changes"
@@ -756,6 +948,53 @@ class RenamePreviewDialog(QDialog):
         layout.addWidget(summary)
         layout.addWidget(self.text_edit)
         layout.addLayout(btn_layout)
+
+    @staticmethod
+    def _highlight(text, term, color):
+        """Return HTML with all occurrences of term in text highlighted in color.
+        Identifiers are always case-sensitive.
+        """
+        escaped_text = html.escape(text)
+        escaped_term = html.escape(term)
+        pattern = re.compile(re.escape(escaped_term))
+        return pattern.sub(
+            lambda m: f'<span style="background-color:{color};">{m.group(0)}</span>',
+            escaped_text
+        )
+
+    def _render_html(self):
+        """Render full HTML from self._html_lines, applying selection background
+        to the clicked pair of blocks (before + after line).
+        """
+        parts = []
+        for i, div in enumerate(self._html_lines):
+            # _selected_block is the first (before) block of the selected pair.
+            # Both blocks in the pair (i and i+1) get the gray background.
+            if (self._selected_block >= 0 and
+                    (i == self._selected_block or i == self._selected_block + 1)):
+                selected_div = div.replace(
+                    'white-space:pre;"',
+                    f'white-space:pre; background-color:{self.SELECTED_BG};"',
+                    1
+                )
+                parts.append(selected_div)
+            else:
+                parts.append(div)
+        return ''.join(parts)
+
+    def _on_click(self, event):
+        """Map a mouse click in the text area to a table row navigation."""
+        QTextEdit.mousePressEvent(self.text_edit, event)
+        block_number = self.text_edit.textCursor().blockNumber()
+        if 0 <= block_number < len(self._result_map):
+            # Normalise to the first block of the pair (always even-indexed)
+            self._selected_block = block_number - (block_number % 2)
+            self.text_edit.setHtml(self._render_html())
+            row_index = self._result_map[block_number]
+            index = self._window.model.index(row_index, column_index(PROCESS_NAME_HDR))
+            self._window.table_view.setCurrentIndex(index)
+            self._window.table_view.scrollTo(index)
+            self._window.raise_()
 
     def _do_rename(self):
         """Execute the rename then close the preview."""
@@ -802,6 +1041,19 @@ class RenameDialog(QDialog):
         self.to_edit = QLineEdit()
         self.to_edit.setMinimumWidth(360)
 
+        # --- Selected Rows field ---
+        rows_label = QLabel("Selected Rows:")
+        self.rows_edit = QLineEdit()
+        self.rows_edit.setMinimumWidth(360)
+        self.rows_edit.setToolTip(
+            "Rows to rename. Examples:\n"
+            "  1-      row 1 to end (all rows)\n"
+            "  10-     row 10 to end\n"
+            "  3-10    rows 3 through 10\n"
+            "  1,2,5   rows 1, 2, and 5\n"
+            "  1-20,30 rows 1 through 20, and 30"
+        )
+
         # --- Status label ---
         self.status_label = QLabel("")
         self.status_label.setStyleSheet("color: gray;")
@@ -830,11 +1082,14 @@ class RenameDialog(QDialog):
         layout.addWidget(self.from_edit)
         layout.addWidget(to_label)
         layout.addWidget(self.to_edit)
+        layout.addWidget(rows_label)
+        layout.addWidget(self.rows_edit)
         layout.addWidget(self.status_label)
         layout.addLayout(btn_layout)
 
         self.from_edit.textChanged.connect(self._clear_status)
         self.to_edit.textChanged.connect(self._clear_status)
+        self.rows_edit.textChanged.connect(self._clear_status)
         self.process_radio.toggled.connect(self._clear_status)
 
     def _clear_status(self):
@@ -850,10 +1105,26 @@ class RenameDialog(QDialog):
         else:
             self.status_label.setStyleSheet("color: gray;")
 
+    def _default_rows_text(self):
+        """Return the default Selected Rows string for the current table size."""
+        n = self.window.model.rowCount() if self.window.model else 0
+        return f"1-{n}" if n > 0 else "1-"
+
+    def _get_selected_rows(self):
+        """Parse the Selected Rows field and return a sorted list of 0-based indices.
+        Sets status and returns None on error.
+        """
+        row_count = self.window.model.rowCount() if self.window.model else 0
+        try:
+            return parse_row_selection(self.rows_edit.text(), row_count)
+        except ValueError as e:
+            self._set_status(str(e), error=True)
+            return None
+
     def _validate(self):
-        """Validate From/To fields for the current scope mode.
-        Returns (from_text, to_text, mode) on success, or None on failure
-        (sets status label with the error message).
+        """Validate From/To and Selected Rows fields for the current scope mode.
+        Returns (from_text, to_text, mode, selected_rows) on success, or None
+        on failure (sets status label with the error message).
         """
         from_text = self.from_edit.text().strip()
         to_text   = self.to_edit.text().strip()
@@ -886,7 +1157,11 @@ class RenameDialog(QDialog):
             self._set_status("'From' and 'To' are identical — nothing to rename.", error=True)
             return None
 
-        return from_text, to_text, mode
+        selected_rows = self._get_selected_rows()
+        if selected_rows is None:
+            return None
+
+        return from_text, to_text, mode, selected_rows
 
     def preview_all(self):
         """Collect changes via dry-run and show the preview dialog (modal)."""
@@ -896,9 +1171,9 @@ class RenameDialog(QDialog):
         result = self._validate()
         if result is None:
             return
-        from_text, to_text, mode = result
+        from_text, to_text, mode, selected_rows = result
 
-        changes = self.window.collect_rename_changes(from_text, to_text, mode)
+        changes = self.window.collect_rename_changes(from_text, to_text, mode, selected_rows)
         if not changes:
             self._set_status(f'"{from_text}" not found — nothing to rename.', error=True)
             return
@@ -906,11 +1181,11 @@ class RenameDialog(QDialog):
         self._clear_status()
 
         def do_rename():
-            count = self.window.do_rename_all(from_text, to_text, mode)
+            count = self.window.do_rename_all(from_text, to_text, mode, selected_rows)
             noun = "occurrence" if count == 1 else "occurrences"
             self._set_status(f"Renamed {count} {noun}.", success=True)
 
-        dlg = RenamePreviewDialog(self, changes, do_rename)
+        dlg = RenamePreviewDialog(self, changes, from_text, to_text, do_rename)
         dlg.exec()
 
     def rename_all(self):
@@ -921,8 +1196,8 @@ class RenameDialog(QDialog):
         result = self._validate()
         if result is None:
             return
-        from_text, to_text, mode = result
-        count = self.window.do_rename_all(from_text, to_text, mode)
+        from_text, to_text, mode, selected_rows = result
+        count = self.window.do_rename_all(from_text, to_text, mode, selected_rows)
         if count == 0:
             self._set_status(f'"{from_text}" not found — nothing renamed.', error=True)
         else:
@@ -2100,6 +2375,8 @@ class DataFrameEditor(QMainWindow):
         """Open (or raise) the modeless Find dialog."""
         if self._find_dialog is None:
             self._find_dialog = FindDialog(self)
+        # Always refresh default row selection to reflect current table size
+        self._find_dialog.rows_edit.setText(self._find_dialog._default_rows_text())
         self._find_dialog.show()
         self._find_dialog.raise_()
         self._find_dialog.activateWindow()
@@ -2109,6 +2386,8 @@ class DataFrameEditor(QMainWindow):
         """Open (or raise) the modeless Rename dialog."""
         if self._rename_dialog is None:
             self._rename_dialog = RenameDialog(self)
+        # Always refresh default row selection to reflect current table size
+        self._rename_dialog.rows_edit.setText(self._rename_dialog._default_rows_text())
         self._rename_dialog.show()
         self._rename_dialog.raise_()
         self._rename_dialog.activateWindow()
@@ -2138,11 +2417,12 @@ class DataFrameEditor(QMainWindow):
                 )
             return pattern, from_proc, from_task
 
-    def collect_rename_changes(self, from_text, to_text, mode):
+    def collect_rename_changes(self, from_text, to_text, mode, selected_rows):
         """Dry-run: return a list of (line_no, before_label, after_label) tuples
         describing every cell that would be changed by do_rename_all().
 
         line_no      -- 1-based row number as shown in the table
+        selected_rows -- sorted list of 0-based row indices to search
         before_label -- e.g. 'X_Axis:X_Move'  or
                               'X_Axis:X_Move.Start-f: Start(X_Axis:X_Move)+0.1'
         after_label  -- same structure with substitution applied
@@ -2152,7 +2432,7 @@ class DataFrameEditor(QMainWindow):
         formula_pattern, from_proc, from_task = self._build_rename_pattern(from_text, mode)
 
         if mode == 'process':
-            for row_index in range(self.dataframe.shape[0]):
+            for row_index in selected_rows:
                 line_no = row_index + 1
                 proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
                 task_val = str(self.dataframe.iloc[row_index][TASK_NAME_HDR])
@@ -2181,7 +2461,7 @@ class DataFrameEditor(QMainWindow):
             to_task = to_text[colon_pos_to + 1:]
             repl = to_text if from_proc else f':{to_task}'
 
-            for row_index in range(self.dataframe.shape[0]):
+            for row_index in selected_rows:
                 line_no = row_index + 1
                 proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
                 task_val = str(self.dataframe.iloc[row_index][TASK_NAME_HDR])
@@ -2195,7 +2475,7 @@ class DataFrameEditor(QMainWindow):
                     if pt_before != pt_after:
                         changes.append((line_no, pt_before, pt_after))
 
-                # Formula column changes (all rows)
+                # Formula column changes
                 for formula_col, col_label in (
                     (START_TIME_FORMULA_HDR, 'Start-f'),
                     (END_TIME_FORMULA_HDR,   'End-f'),
@@ -2210,11 +2490,12 @@ class DataFrameEditor(QMainWindow):
         debugging.leave(f'len(changes)={len(changes)}')
         return changes
 
-    def do_rename_all(self, from_text, to_text, mode):
+    def do_rename_all(self, from_text, to_text, mode, selected_rows):
         """Atomically rename a Process Name or Process:Task Name across the file.
 
-        Operates directly on self.dataframe, then calls apply_rules_and_populate_model()
-        for a single clean rebuild.  Returns the total number of cell-level changes made.
+        Operates directly on self.dataframe for rows in selected_rows, then
+        calls apply_rules_and_populate_model() for a single clean rebuild.
+        Returns the total number of cell-level changes made.
         """
         debugging.enter(f'from_text={from_text!r}, to_text={to_text!r}, mode={mode}')
 
@@ -2222,7 +2503,7 @@ class DataFrameEditor(QMainWindow):
         formula_pattern, from_proc, from_task = self._build_rename_pattern(from_text, mode)
 
         if mode == 'process':
-            for row_index in range(self.dataframe.shape[0]):
+            for row_index in selected_rows:
                 proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
                 if proc_val == from_text:
                     self.dataframe.iloc[row_index, column_index(PROCESS_NAME_HDR)] = to_text
@@ -2240,7 +2521,7 @@ class DataFrameEditor(QMainWindow):
             to_task = to_text[colon_pos_to + 1:]
             repl = to_text if from_proc else f':{to_task}'
 
-            for row_index in range(self.dataframe.shape[0]):
+            for row_index in selected_rows:
                 proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
                 task_val = str(self.dataframe.iloc[row_index][TASK_NAME_HDR])
 
