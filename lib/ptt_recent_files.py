@@ -36,8 +36,8 @@ sections ('RECENT_FILES_PTTD' and 'RECENT_FILES_PTTP') in the same INI.
 import os
 import configparser
 
-from PySide6.QtWidgets import QMenu
-from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QMenu, QToolTip
+from PySide6.QtGui import QAction, QCursor
 
 
 # Maximum label length for menu display (chars); longer paths are elided
@@ -161,10 +161,14 @@ class RecentFiles:
                 else:
                     label = f'   {display}'
                 action = QAction(label, parent_widget)
-                action.setToolTip(file_path)
                 # Capture file_path in closure
                 action.triggered.connect(
                     lambda checked=False, fp=file_path: open_callback(fp)
+                )
+                action.hovered.connect(
+                    lambda fp=file_path: QToolTip.showText(
+                        QCursor.pos(), fp, menu
+                    )
                 )
                 menu.addAction(action)
 
@@ -205,6 +209,7 @@ class RecentFiles:
                 break
             val = cfg.get(self._section, key).strip()
             if val:
+                val = os.path.normpath(os.path.abspath(val))
                 # Silently drop stale entries (file no longer exists)
                 if os.path.isfile(val):
                     loaded.append(val)
