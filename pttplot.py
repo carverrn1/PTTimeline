@@ -2966,7 +2966,8 @@ def save_pttp_config(pttp_filename, make_backup=True):
         file already exists and backups_on_bool is enabled in config.
         Pass False for auto-creation paths where no prior file exists.
     """
-    SKIP_SECTIONS = {'META', 'DEBUGGING', 'EXTERNAL_PROGRAMS', 'BACKUPS', CONFIG_PROCESS_ATTRIBUTES_OPTIONS}
+    SKIP_SECTIONS = {'META', 'DEBUGGING', 'EXTERNAL_PROGRAMS', 'BACKUPS',
+                     CONFIG_PROCESS_ATTRIBUTES_OPTIONS, 'ANNOTATIONS.MARKERS'}
 
     debugging.enter(f'pttp_filename={pttp_filename}, make_backup={make_backup}')
 
@@ -2990,9 +2991,68 @@ def save_pttp_config(pttp_filename, make_backup=True):
                 continue
             pttp_cfg.set(section, key, str(value))
 
+    def _serialize_marker(m):
+        """
+        Serialize a marker dict back to the INI line value format:
+          label=...; time=...; linestyle=...; linewidth_float=...; color=...;
+          fontsize_float=...; fontstyle=...; position=...; rotation_float=...
+        Field order matches the documented format.
+        """
+        # time: reconstruct formula or literal float
+        if m['time'] is None:
+            edge, proc, task = m['time_ref']
+            func = 'Start' if edge == 'start' else 'End'
+            time_str = f'{func}({proc}:{task})'
+        else:
+            time_str = str(m['time'])
+
+        # fontstyle: reverse _parse_fontstyle — (fontweight, fontstyle) -> display string
+        fw = m.get('fontweight', 'normal')
+        fs = m.get('fontstyle', 'normal')
+        if fw == 'bold' and fs == 'italic':
+            fontstyle_str = 'Bold Italic'
+        elif fw == 'bold':
+            fontstyle_str = 'Bold'
+        elif fs == 'italic':
+            fontstyle_str = 'Italic'
+        else:
+            fontstyle_str = 'Normal'
+
+        # position: reverse _parse_marker_position — float -> display string
+        pos = m.get('position', 1.0)
+        if pos == 1.0:
+            position_str = 'Top'
+        elif pos == 0.0:
+            position_str = 'Bottom'
+        elif pos == 0.5:
+            position_str = 'Center'
+        else:
+            position_str = f'{pos * 100.0:g}%'
+
+        return (
+            f"label={m['name']}; "
+            f"time={time_str}; "
+            f"linestyle={m['linestyle']}; "
+            f"linewidth_float={m['linewidth']}; "
+            f"color={m['color']}; "
+            f"fontsize_float={m['fontsize']}; "
+            f"fontstyle={fontstyle_str}; "
+            f"position={position_str}; "
+            f"rotation_float={m['rotation']}"
+        )
+
     try:
         with open(pttp_filename, 'w', encoding='utf-8') as f:
             pttp_cfg.write(f)
+
+            # Write [ANNOTATIONS.MARKERS] section manually so _markers are
+            # serialized back to INI lines (configparser only knows about
+            # scalar keys; the parsed marker list lives in _markers).
+            f.write('[ANNOTATIONS.MARKERS]\n')
+            markers = config.get('ANNOTATIONS.MARKERS', {}).get('_markers', [])
+            for m in markers:
+                f.write(f"{m['key']} = {_serialize_marker(m)}\n")
+            f.write('\n')
 
             # Write [PROCESS_ATTRIBUTES] section with comment header.
             # One entry per process (palette order); per-process overrides preserved
