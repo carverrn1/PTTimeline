@@ -46,6 +46,7 @@ Claude_Project_Files/
 *.log
 * - Copy*.*
 files/
+**/ptt_backups/
 
 # -----------------------------------------------------------------------------
 # Archive files
