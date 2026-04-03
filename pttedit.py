@@ -1746,8 +1746,9 @@ class DataFrameEditor(QMainWindow):
                 if (not pttd_filename): return
 
             debugging.print(f'File for plotter: {pttd_filename}')
-            # Save current timeline data before starting plotter
-            self.save_timeline_to_pttd(pttd_filename)
+            # Save current timeline data before starting plotter (only if modified)
+            if self.file_modified:
+                self.save_timeline_to_pttd(pttd_filename)
             
             try:
                 if (Path(exe_name).parent == Path('.')):            # If no path specified for exe:
