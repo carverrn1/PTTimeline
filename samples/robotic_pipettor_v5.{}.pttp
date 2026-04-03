@@ -1,7 +1,7 @@
 [PLOTTING]
 window_maximized_bool = False
 title_text = Process-Task Timeline
-x_axis_label = Time
+x_axis_label = Time (s)
 y_axis_label = Processes
 set_major_locator_float = 1.0
 set_minor_locator_float = 0.1
@@ -50,16 +50,14 @@ position = top
 rotation_float = 0.0
 
 [ANNOTATIONS.MARKERS]
-; Demo markers
-;marker0=label=←0.0 (NOTE: This demo Marker); time=0.0; linestyle=dotted; linewidth_float=6; color=red; fontsize_float=10; fontstyle=italic; position=top; rotation_float=90
-marker01 = label=LS1; time=Start(:_LS1); color=blue; rotation_float=90; linewidth_float=1; fontstyle=bold
-marker02 = label=LS2; time=Start(:_LS2); color=blue; rotation_float=90; linewidth_float=1; fontstyle=bold
-marker03 = label=LS3; time=Start(:_LS3); color=blue; rotation_float=90; linewidth_float=1; fontstyle=bold
-marker04 = label=LS4; time=Start(:_LS4); color=blue; rotation_float=90; linewidth_float=1; fontstyle=bold
-marker11 = label=Path_Adv; time=Start(Process_Path:Advance_Track_LS1); color=purple; position=bottom; linestyle=dotted; linewidth_float=1; fontstyle=bold; rotation_float=10
-marker12 = label=X; time=End(Process_Path:Advance_Track_LS1); color=purple; position=bottom; linestyle=dotted; linewidth_float=1
-marker21 = label=Path_Adv; time=Start(Process_Path:Advance_Track_LS2); color=purple; position=bottom; linestyle=dotted; linewidth_float=1; fontstyle=bold; rotation_float=10
-marker22 = label=X; time=End(Process_Path:Advance_Track_LS2); color=purple; position=bottom; linestyle=dotted; linewidth_float=1
+marker01 = label=LS1; time=Start(:_LS1); linestyle=dashed; linewidth_float=1.0; color=blue; fontsize_float=7.0; fontstyle=Bold; position=Top; rotation_float=90.0
+marker02 = label=LS2; time=Start(:_LS2); linestyle=dashed; linewidth_float=1.0; color=blue; fontsize_float=7.0; fontstyle=Bold; position=Top; rotation_float=90.0
+marker03 = label=LS3; time=Start(:_LS3); linestyle=dashed; linewidth_float=1.0; color=blue; fontsize_float=7.0; fontstyle=Bold; position=Top; rotation_float=90.0
+marker04 = label=LS4; time=Start(:_LS4); linestyle=dashed; linewidth_float=1.0; color=blue; fontsize_float=7.0; fontstyle=Bold; position=Top; rotation_float=90.0
+marker11 = label=Path_Adv; time=Start(Process_Path:Advance_Track_LS1); linestyle=dotted; linewidth_float=1.0; color=purple; fontsize_float=7.0; fontstyle=Bold; position=Bottom; rotation_float=10.0
+marker12 = label=X; time=End(Process_Path:Advance_Track_LS1); linestyle=dotted; linewidth_float=1.0; color=purple; fontsize_float=7.0; fontstyle=Normal; position=Bottom; rotation_float=0.0
+marker21 = label=Path_Adv; time=Start(Process_Path:Advance_Track_LS2); linestyle=dotted; linewidth_float=1.0; color=purple; fontsize_float=7.0; fontstyle=Bold; position=Bottom; rotation_float=10.0
+marker22 = label=X; time=End(Process_Path:Advance_Track_LS2); linestyle=dotted; linewidth_float=1.0; color=purple; fontsize_float=7.0; fontstyle=Normal; position=Bottom; rotation_float=0.0
 
 ; ==============================================================================
 ; PROCESS_ATTRIBUTES Section
