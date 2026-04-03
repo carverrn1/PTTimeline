@@ -6,7 +6,7 @@
         META: {
             app_package: "PTTimeline",
             app_name: "PTTEdit",
-            app_version: "0.5.0-dev.8",
+            app_version: "0.5.0-dev.9",
             ini_version: "2",
         },
         DEBUGGING: {
