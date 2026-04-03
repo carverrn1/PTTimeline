@@ -1,9 +1,84 @@
 # ptt_utils.py — Shared utility functions for PTTimeline applications
 
+import os
 import re
+import shutil
 import platform
 import urllib.request
 import urllib.parse
+
+
+def backup_file_on_save(filepath: str, backup_folder: str, max_backups: int) -> None:
+    """Create a timestamped backup of *filepath* before it is overwritten.
+
+    Backup filenames use the format::
+
+        <original_filename>.<YYYYMMDD-HHMMSS>.bak
+
+    For example::
+
+        project.pttd.20260402-102700.bak
+
+    Backups are written to *backup_folder*.  If *backup_folder* is a relative
+    path it is resolved relative to the directory containing *filepath*.  If
+    the folder does not exist it is created automatically.  If *backup_folder*
+    is blank, backups are placed in the same directory as *filepath*.
+
+    If the file does not yet exist no backup is made (first-time save).
+
+    If *max_backups* is >= 1 and the number of existing backups for this file
+    reaches or exceeds the limit, the oldest backup(s) are deleted before the
+    new one is written.  Oldest is determined by the timestamp embedded in the
+    backup filename, so the sort is reliable regardless of OS file timestamps.
+    If *max_backups* is 0 or negative there is no limit.
+
+    Parameters
+    ----------
+    filepath:
+        Absolute or relative path to the file about to be written.
+    backup_folder:
+        Subfolder name (or path) for backup files.  Surrounding quotes are
+        stripped so both ``ptt_backups`` and ``"ptt backups"`` work correctly.
+        Pass an empty string to place backups alongside the source file.
+    max_backups:
+        Maximum number of backup copies to keep.  0 or negative means unlimited.
+    """
+    from datetime import datetime
+
+    if not os.path.isfile(filepath):
+        return  # nothing to back up on a first-time save
+
+    src_dir  = os.path.dirname(os.path.abspath(filepath))
+    src_name = os.path.basename(filepath)
+
+    # Strip surrounding quotes from backup_folder (INI courtesy)
+    folder = backup_folder.strip().strip('"').strip("'")
+
+    if folder:
+        dst_dir = folder if os.path.isabs(folder) else os.path.join(src_dir, folder)
+        os.makedirs(dst_dir, exist_ok=True)
+    else:
+        dst_dir = src_dir
+
+    # Build the timestamped backup filename
+    timestamp   = datetime.now().strftime('%Y%m%d-%H%M%S')
+    backup_name = f'{src_name}.{timestamp}.bak'
+    backup_path = os.path.join(dst_dir, backup_name)
+
+    # Enforce max_backups limit: collect existing backups for this source file,
+    # sorted by the embedded timestamp (oldest first), and delete the excess.
+    if max_backups >= 1:
+        import glob
+        pattern  = os.path.join(dst_dir, f'{src_name}.????????-??????.bak')
+        existing = sorted(glob.glob(pattern))   # lexicographic == chronological
+        excess   = len(existing) - (max_backups - 1)
+        for old in existing[:excess]:
+            try:
+                os.remove(old)
+            except OSError:
+                pass  # best-effort; failure here is non-critical
+
+    shutil.copy2(filepath, backup_path)
 
 
 def get_os_info() -> str:

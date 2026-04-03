@@ -709,6 +709,69 @@
       </table>
     </div>
 
+    <h3 id="backup-on-save">Backup on Save</h3>
+    <p>
+      When saving to a file that already exists, PTTEdit can automatically create a timestamped
+      backup before overwriting it. This protects against accidental data loss and lets you
+      revert to a previous save if needed.
+    </p>
+    <p>
+      Backup files are named using the format <code>&lt;filename&gt;.YYYYMMDD-HHMMSS.bak</code>
+      and are placed in a configurable subfolder relative to the <code>.pttd</code> file:
+    </p>
+    <pre><code>project.pttd                          <span class="sc">; the live file</span>
+ptt_backups/
+    project.pttd.20260402-102700.bak  <span class="sc">; earlier save</span>
+    project.pttd.20260402-103415.bak  <span class="sc">; most recent backup</span></code></pre>
+    <p>
+      No backup is created on the very first save (when the file does not yet exist).
+      The backup folder is created automatically if it does not exist.
+      If the backup folder is left blank, backups are placed in the same directory as the
+      <code>.pttd</code> file.
+    </p>
+    <p>
+      When the number of existing backups reaches <code>backups_max_int</code>, the oldest
+      backup is deleted before the new one is written. The oldest backup is determined by
+      the timestamp embedded in the filename, so the ordering is reliable regardless of OS
+      file timestamps. Set <code>backups_max_int</code> to 0 or less for unlimited backups.
+    </p>
+    <p>
+      Backup behaviour is controlled by three keys in the <code>[BACKUPS]</code> section of
+      <code>pttedit.ini</code>:
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>backups_on_bool</code></td>
+            <td><code>True</code></td>
+            <td>Enable or disable backup on save. Set to <code>False</code> to turn off backups entirely.</td>
+          </tr>
+          <tr>
+            <td><code>backups_folder</code></td>
+            <td><code>ptt_backups</code></td>
+            <td>
+              Subfolder name for backup files, relative to the <code>.pttd</code> file location.
+              Spaces are allowed (quotes are optional). Leave blank to place backups in the
+              same folder as the <code>.pttd</code> file.
+            </td>
+          </tr>
+          <tr>
+            <td><code>backups_max_int</code></td>
+            <td><code>100</code></td>
+            <td>
+              Maximum number of backup copies to keep. When the limit is reached, the oldest
+              backup is deleted before a new one is written. Set to <code>0</code> or less
+              for unlimited backups.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <h3 id="file-format">File Format (.pttd)</h3>
 
     <p>

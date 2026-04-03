@@ -53,7 +53,7 @@ def show_splash():
 PROGRAM_FILENAME = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 capitalize_first_four = lambda s: s[:4].upper() + s[4:]     # Capitalize first 4 letters
 from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID, APP_REPO_URL
-from ptt_utils import html_to_plain_text, build_issue_url, get_os_info
+from ptt_utils import html_to_plain_text, build_issue_url, get_os_info, backup_file_on_save
 PROGRAM_NAME    = capitalize_first_four(PROGRAM_FILENAME)
 PACKAGE_NAME    = APP_PACKAGE
 
@@ -72,7 +72,7 @@ DEFAULT_CONFIG = """\
 app_package=PTTimeline
 app_name=PTTPlot
 app_version=0.0.0
-ini_version=1
+ini_version=2
 
 [DEBUGGING]
 enabled_bool=False
@@ -86,6 +86,16 @@ pdf_viewer_py=pttview.py
 pdf_viewer_exe=pttview.exe
 svg_viewer_py=pttview.py
 svg_viewer_exe=pttview.exe
+
+[BACKUPS]
+; backups_on_bool  - Enable or disable backup on save.
+backups_on_bool=True
+; backups_folder   - Subfolder for backup files, relative to the .pttp file location.
+;                    Leave blank to place backups in the same folder as the .pttp file.
+backups_folder=ptt_backups
+; backups_max_int  - Maximum number of backup files to keep. Oldest are deleted when
+;                    the limit is reached. Set to 0 or less for unlimited backups.
+backups_max_int=100
 
 [PLOTTING]
 window_maximized_bool=False
@@ -2938,7 +2948,7 @@ def load_file_ini(pttd_filename):
     debugging.print(f"Per-file INI applied: {ini_filename}")
     debugging.leave()
 
-def save_pttp_config(pttp_filename):
+def save_pttp_config(pttp_filename, make_backup=True):
     """
     Write the current config to a .pttp INI file.
     Called when auto-creating a default sample.{}.pttp alongside a .pttd file.
@@ -2946,10 +2956,29 @@ def save_pttp_config(pttp_filename):
     application-level settings, not per-file presentation settings.
     PROCESS_ATTRIBUTES is handled separately with its own comment header and
     one entry per process in palette order (color expressed as hex).
-    """
-    SKIP_SECTIONS = {'META', 'DEBUGGING', 'EXTERNAL_PROGRAMS', CONFIG_PROCESS_ATTRIBUTES_OPTIONS}
 
-    debugging.enter(f'pttp_filename={pttp_filename}')
+    Parameters
+    ----------
+    pttp_filename:
+        Destination path for the .pttp file.
+    make_backup:
+        When True (default), a timestamped backup is created if the
+        file already exists and backups_on_bool is enabled in config.
+        Pass False for auto-creation paths where no prior file exists.
+    """
+    SKIP_SECTIONS = {'META', 'DEBUGGING', 'EXTERNAL_PROGRAMS', 'BACKUPS', CONFIG_PROCESS_ATTRIBUTES_OPTIONS}
+
+    debugging.enter(f'pttp_filename={pttp_filename}, make_backup={make_backup}')
+
+    if make_backup and config['BACKUPS']['backups_on_bool'] and os.path.isfile(pttp_filename):
+        try:
+            backup_file_on_save(pttp_filename, config['BACKUPS']['backups_folder'], config['BACKUPS']['backups_max_int'])
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(None, 'Backup Error',
+                f'Failed to create backup of:\n{pttp_filename}\n\nError: {e}\n\nThe file was not saved.')
+            debugging.leave()
+            return
 
     pttp_cfg = _make_parser()
     for section, keys in config.items():
@@ -3021,7 +3050,7 @@ def load_pttp_config(pttp_filename, auto_discovered=False):
     if not os.path.exists(pttp_filename):
         if auto_discovered:
             debugging.print(f"Auto-discovered PTTP not found — creating: {pttp_filename}")
-            save_pttp_config(pttp_filename)
+            save_pttp_config(pttp_filename, make_backup=False)
         else:
             # Explicitly passed but missing — should have been caught by caller
             debugging.print(f"ERROR: PTTP file not found: {pttp_filename}")

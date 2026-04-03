@@ -32,7 +32,7 @@ PROGRAM_FILENAME = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 
 capitalize_first_four = lambda s: s[:4].upper() + s[4:]     # Capitalize first 4 letters
 from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID, APP_REPO_URL
-from ptt_utils import html_to_plain_text, build_issue_url, get_os_info
+from ptt_utils import html_to_plain_text, build_issue_url, get_os_info, backup_file_on_save
 PROGRAM_NAME    = capitalize_first_four(PROGRAM_FILENAME)
 PACKAGE_NAME    = APP_PACKAGE
 
@@ -80,7 +80,7 @@ DEFAULT_CONFIG = """\
 app_package=PTTimeline
 app_name=PTTEdit
 app_version=0.0.0
-ini_version=1
+ini_version=2
 
 [DEBUGGING]
 enabled_bool=False
@@ -90,6 +90,16 @@ filename=pttedit.dbg
 python_exe=python
 plotter_py=pttplot.py
 plotter_exe=pttplot.exe
+
+[BACKUPS]
+; backups_on_bool  - Enable or disable backup on save.
+backups_on_bool=True
+; backups_folder   - Subfolder for backup files, relative to the .pttd file location.
+;                    Leave blank to place backups in the same folder as the .pttd file.
+backups_folder=ptt_backups
+; backups_max_int  - Maximum number of backup files to keep. Oldest are deleted when
+;                    the limit is reached. Set to 0 or less for unlimited backups.
+backups_max_int=100
 """
 
 RECENT_FILES_MAX = 15
@@ -3022,6 +3032,16 @@ class DataFrameEditor(QMainWindow):
     def save_timeline_to_pttd(self, filename):
         global config
         debugging.enter(f"filename={filename}")
+
+        if config['BACKUPS']['backups_on_bool'] and os.path.isfile(filename):
+            try:
+                backup_file_on_save(filename, config['BACKUPS']['backups_folder'], config['BACKUPS']['backups_max_int'])
+            except Exception as e:
+                QMessageBox.critical(self, 'Backup Error',
+                    f'Failed to create backup of:\n{filename}\n\nError: {e}\n\nThe file was not saved.')
+                debugging.leave()
+                return
+
         data = [[self.model.item(row, col).text() for col in range(self.model.columnCount())] for row in range(self.model.rowCount())]
         # df = pd.DataFrame(data, columns=[self.model.horizontalHeaderItem(i).text() for i in range(self.model.columnCount())])
         df = pd.DataFrame(data, columns=[COLUMN_NAMES[i] for i in range(self.model.columnCount())])
@@ -3042,6 +3062,13 @@ class DataFrameEditor(QMainWindow):
 
         # Commit any active cell editor before saving so the current edit is included
         self.table_view.setFocus()
+
+        # Skip save if nothing has changed
+        if not self.file_modified:
+            self.update_status_bar("No changes found. Save skipped.")
+            QTimer.singleShot(3000, lambda: self.update_status_bar("Ready"))
+            debugging.leave('No changes, save skipped')
+            return
 
         # If we have a working filename, save directly without prompting
         if self.workingFilename and not self.windowTitle().endswith("*New*"):
