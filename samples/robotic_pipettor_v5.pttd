@@ -6,8 +6,8 @@
         META: {
             app_package: "PTTimeline",
             app_name: "PTTEdit",
-            app_version: "0.4.1-dev.2",
-            ini_version: "1",
+            app_version: "0.5.0-dev.8",
+            ini_version: "2",
         },
         DEBUGGING: {
             enabled_bool: false,
@@ -17,6 +17,11 @@
             python_exe: "python",
             plotter_py: "pttplot.py",
             plotter_exe: "pttplot.exe",
+        },
+        BACKUPS: {
+            backups_on_bool: true,
+            backups_folder: "ptt_backups",
+            backups_max_int: 100,
         },
     },
     dataframe: {
