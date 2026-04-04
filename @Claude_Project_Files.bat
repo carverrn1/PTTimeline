@@ -33,6 +33,9 @@ copy /y _*.py "%target_folder%"
 copy /y *.md "%target_folder%"
 copy /y *.txt "%target_folder%"
 
+:: Release Notes
+copy /y "Releases\*.md" "%target_folder%"
+
 :: Source Files
 copy /y requirements.txt "%target_folder%"
 copy /y pttedit.py "%target_folder%"
@@ -64,7 +67,6 @@ copy /y license.txt "%target_folder%"
 
 :: Cleanup unwanted files
 del "%target_folder%"\*.bak*
-del "%target_folder%"\lib\*.bak*
 
 
 :: Open the folder
