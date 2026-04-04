@@ -36,6 +36,9 @@ copy /y *.txt "%target_folder%"
 :: Release Notes
 copy /y "Releases\*.md" "%target_folder%"
 
+:: Example app INI files (defaults)
+copy /y "INI\*.ini" "%target_folder%"
+
 :: Source Files
 copy /y requirements.txt "%target_folder%"
 copy /y pttedit.py "%target_folder%"
