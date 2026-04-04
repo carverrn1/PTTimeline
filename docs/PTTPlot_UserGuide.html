@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PTTPlot User Guide — PTTimeline v0.4.0-dev</title>
+<title>PTTPlot User Guide — PTTimeline v0.5.0-dev</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -287,7 +287,7 @@
 
   <!-- PAGE HEADER -->
   <header class="page-header">
-    <div class="app-label">PTTimeline v0.4.0-dev</div>
+    <div class="app-label">PTTimeline v0.5.0-dev</div>
     <h1>PTTPlot User Guide</h1>
     <div class="subtitle">Timeline Chart Plotter &mdash; Gantt-style horizontal bar charts from .pttd data files</div>
     <div class="data-flow">
@@ -350,6 +350,15 @@ python pttplot.py path/to/file.pttd</code></pre>
       When a filename is provided, the chart renders immediately on startup. Without a filename,
       PTTPlot opens to a blank window and waits for a file to be opened via the menu.
     </p>
+
+    <h3>Opening from Windows Explorer</h3>
+    <p>
+      On Windows, the PTTimeline installer registers PTTPlot as an additional handler for
+      <code>.pttd</code> files. Double-clicking a <code>.pttd</code> file opens it in PTTEdit
+      (the default). To open it directly in PTTPlot instead, right-click the file in Explorer
+      and choose <strong>Open with PTTPlot</strong> from the context menu or the
+      <em>Open with</em> flyout.
+    </p>
   </section>
 
   <!-- 2. INTERFACE OVERVIEW -->
@@ -407,6 +416,15 @@ python pttplot.py path/to/file.pttd</code></pre>
     <p>
       Opens a standard file browser to select a <code>.pttd</code> file. Once selected, the chart
       renders immediately. Any previously loaded file is replaced.
+    </p>
+
+    <h3>Open Recent</h3>
+    <p>
+      Opens a submenu listing the most recently opened <code>.pttd</code> files (up to 15 entries,
+      newest first). Entries 1–9 have keyboard accelerators. Hovering over an entry shows the full
+      path in a tooltip. Stale entries (files no longer on disk) are silently pruned when the submenu
+      opens. A <strong>Clear Recent Files</strong> item at the bottom clears the entire list. The
+      file dialog for Open defaults to the directory of the most recent entry.
     </p>
 
     <h3>Save Formats</h3>
@@ -517,6 +535,14 @@ python pttplot.py path/to/file.pttd</code></pre>
       Selecting a presentation from the list reloads the chart with that presentation's configuration.
       The current presentation name is highlighted in the list so you can see which one is active.
       This item is disabled until a file is loaded.
+    </p>
+
+    <h3>Open Recent</h3>
+    <p>
+      Opens a submenu listing the most recently opened <code>.pttp</code> presentation files (up to
+      15 entries, newest first). This list is separate from the File &rarr; Open Recent list for
+      <code>.pttd</code> files. Hovering over an entry shows the full path in a tooltip. A
+      <strong>Clear Recent Files</strong> item at the bottom clears the list.
     </p>
 
     <h3>Save&hellip;</h3>
@@ -1373,7 +1399,7 @@ ptt_backups/
 
   <!-- FOOTER -->
   <footer>
-    <strong>PTTimeline v0.4.0-dev</strong> &mdash; PTTPlot User Guide
+    <strong>PTTimeline v0.5.0-dev</strong> &mdash; PTTPlot User Guide
   </footer>
 
 </div>

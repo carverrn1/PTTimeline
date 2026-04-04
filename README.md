@@ -22,7 +22,7 @@ PTTimeline consists of three companion applications:
 
 | Extension | Format | Owner | Description |
 |-----------|--------|-------|-------------|
-| `.pttd` | JSON | PTTEdit | Timeline data — processes, tasks, durations, dependencies |
+| `.pttd` | JSON5 | PTTEdit | Timeline data — processes, tasks, durations, dependencies |
 | `.pttp` | INI | PTTPlot | Presentation settings — colors, layout, scaling |
 
 ---
@@ -30,30 +30,54 @@ PTTimeline consists of three companion applications:
 ## Key Features
 
 - **Formula-driven task scheduling** — task start/end times can reference other tasks using expressions (`Start()`, `End()`, `Duration()`, `Min()`, `Max()`)
-- **Named durations** — define reusable duration constants in a dedicated process
-- **Three-tier configuration** — hardcoded defaults → user INI → per-presentation overrides
+- **Named Constants** — define reusable constants using the "unnamed" process entries
+- **Find & Rename** — locate text across the grid and atomically rename Process or Process:Task names without breaking formula references (PTTEdit)
+- **Open Recent** — File → Open Recent submenu in all three apps, with up to 15 entries and file-dialog directory following the most recent file
+- **Backup on Save** — automatic timestamped backups before overwriting `.pttd` and `.pttp` files, with configurable folder and retention limit
 - **Multiple presentations** — the same `.pttd` data file can drive multiple independent `.pttp` presentations
+- **Open with PTTPlot** — Windows Explorer context menu option to open a `.pttd` file directly in PTTPlot without going through PTTEdit
 - **Professional installer** — Windows x64 installer built with PyInstaller and Inno Setup
 
 ---
 
-## Requirements
+## Installation (Windows)
 
-- Python 3.x
-- PySide6
-- matplotlib
-- pandas
-- Pillow
-- portalocker
+Download and run the PTTimeline installer (`PTTimeline_vX.X.X_Setup.exe`). The installer:
 
-Install dependencies:
-```
-pip install PySide6 matplotlib pandas Pillow portalocker
-```
+- Installs `PTTEdit.exe`, `PTTPlot.exe`, and `PTTView.exe` as self-contained executables (no Python installation required)
+- Registers `.pttd` files to open with PTTEdit by double-click, and adds **Open with PTTPlot** to the Windows Explorer context menu
+- Creates Start Menu shortcuts for all three applications
+- Installs sample `.pttd` and `.pttp` files to `%PUBLIC%\Documents\RNCSoftware\PTTimeline\Samples`
+- Supports upgrade-over-existing installs
+
+The installer is built with [PyInstaller](https://pyinstaller.org) and [Inno Setup](https://jrsoftware.org/isinfo.php).
 
 ---
 
-## Running from Source
+## Sample Files
+
+Sample `.pttd` and `.pttp` files are installed to:
+
+```
+%PUBLIC%\Documents\RNCSoftware\PTTimeline\Samples\
+```
+
+These demonstrate PTTimeline with representative real-world timing diagrams and serve as starting points for new projects.
+
+---
+
+## For Developers
+
+### Requirements
+
+- Python 3.11+
+- PySide6, matplotlib, pandas, Pillow, json5, platformdirs, configupdater, odfpy, PyMuPDF
+
+```
+pip install PySide6 matplotlib pandas Pillow json5 platformdirs configupdater odfpy PyMuPDF
+```
+
+### Running from Source
 
 ```
 python pttedit.py
@@ -61,23 +85,15 @@ python pttplot.py
 python pttview.py
 ```
 
----
-
-## Building
+### Building
 
 ```
-build_all.bat          # Build all executables and installer
-build_exe.bat          # Build executables only
-build_install.bat      # Build installer only (run manually)
+build_all.bat          # Update version, build executables, build installer
+build_exe.bat          # Build executables only (PyInstaller)
+build_install.bat      # Build installer only (Inno Setup, run manually)
 ```
 
-Requires PyInstaller and Inno Setup to be installed.
-
----
-
-## Sample Files
-
-The `samples/` folder contains example `.pttd` and `.pttp` files demonstrating PTTimeline with representative real-world timing diagrams.
+Requires [PyInstaller](https://pyinstaller.org) and [Inno Setup](https://jrsoftware.org/isinfo.php) to be installed.
 
 ---
 
@@ -92,7 +108,9 @@ PTTimeline_Dev/
         ptt_appinfo.py          # Shared version and metadata
         ptt_config.py           # Configuration management
         ptt_debugging.py        # Crash logging
+        ptt_recent_files.py     # Shared recent files manager
         ptt_splash.py           # Splash screen (shared)
+        ptt_utils.py            # Shared utilities
         pttedit_delegates.py    # PTTEdit table delegates
         pttedit_expression_evaluator.py  # Formula engine
     resources/                  # Icons and splash images
@@ -104,7 +122,7 @@ PTTimeline_Dev/
 
 ## Version
 
-Current version: **0.3.1-dev**
+Current version: **v0.5.0-dev**
 
 ---
 

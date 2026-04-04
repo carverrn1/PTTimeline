@@ -287,12 +287,12 @@ def update_iss(v: dict, filename: str = "PTTimeline.iss") -> None:
         report(filename, "#define AppVerName", old_full, new_full)
         text = text[:m.start()] + new_full + text[m.end():]
 
-    # 4. OutputBaseFilename       =PTTimeline-x.x.x...-setup
-    pattern = r'(OutputBaseFilename\s*=\s*)PTTimeline-[^\r\n]+'
+    # 4. OutputBaseFilename       =PTTimeline_x.x.x..._setup
+    pattern = r'(OutputBaseFilename\s*=\s*)PTTimeline_[^\r\n]+'
     m = re.search(pattern, text)
     if m:
         old_full = m.group(0)
-        new_full = m.group(1) + f"PTTimeline-{ver_iss}-setup"
+        new_full = m.group(1) + f"PTTimeline_{ver_iss}_setup"
         report(filename, "OutputBaseFilename", old_full, new_full)
         text = text[:m.start()] + new_full + text[m.end():]
 
