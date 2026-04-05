@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PTTEdit User Guide &mdash; PTTimeline v0.4.0-dev</title>
+<title>PTTEdit User Guide &mdash; PTTimeline v0.5.0-dev</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -355,7 +355,7 @@
 
   <!-- PAGE HEADER -->
   <header class="page-header">
-    <div class="app-label">PTTimeline v0.4.0-dev</div>
+    <div class="app-label">PTTimeline v0.5.0-dev</div>
     <h1>PTTEdit User Guide</h1>
     <div class="subtitle">Timeline Data Editor &mdash; Spreadsheet-like editor for creating and editing .pttd timeline data files</div>
     <div class="data-flow">
@@ -378,6 +378,7 @@
       <li><a href="#formulas">The Formula System</a></li>
       <li><a href="#row-ops">Row Operations</a></li>
       <li><a href="#context-menus">Context Menus</a></li>
+      <li><a href="#edit-menu">Edit Menu (Find &amp; Rename)</a></li>
       <li><a href="#keyboard">Keyboard Shortcuts</a></li>
       <li><a href="#launching">Launching PTTPlot</a></li>
       <li><a href="#status-bar">Status Bar</a></li>
@@ -599,15 +600,6 @@
         </thead>
         <tbody>
           <tr>
-            <td><strong>Demo</strong></td>
-            <td>&mdash;</td>
-            <td>
-              Load a pre-populated example timeline. Useful for exploring features and
-              formula syntax without creating data from scratch. Prompts to save
-              unsaved changes first.
-            </td>
-          </tr>
-          <tr>
             <td><strong>New</strong></td>
             <td>&mdash;</td>
             <td>
@@ -621,6 +613,19 @@
             <td>
               Open a <code>.pttd</code> file via a file picker dialog. The file is
               parsed as JSON5. Prompts to save unsaved changes before opening.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Open Recent</strong></td>
+            <td>&mdash;</td>
+            <td>
+              Opens a submenu listing the most recently opened <code>.pttd</code> files
+              (up to 15 entries, newest first). Entries are numbered 1–9 for quick keyboard
+              access. Hovering over any entry shows the full path in a tooltip. Stale entries
+              (files no longer on disk) are silently removed when the submenu is opened.
+              A <strong>Clear Recent Files</strong> item at the bottom clears the entire list.
+              The file dialog for Open and Save As defaults to the directory of the most recent
+              entry, falling back to the OS default when the list is empty.
             </td>
           </tr>
           <tr>
@@ -712,6 +717,69 @@
             <td>
               Close the application. If there are unsaved changes, a Save / Discard /
               Cancel dialog is shown before exiting.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 id="backup-on-save">Backup on Save</h3>
+    <p>
+      When saving to a file that already exists, PTTEdit can automatically create a timestamped
+      backup before overwriting it. This protects against accidental data loss and lets you
+      revert to a previous save if needed.
+    </p>
+    <p>
+      Backup files are named using the format <code>&lt;filename&gt;.YYYYMMDD-HHMMSS.bak</code>
+      and are placed in a configurable subfolder relative to the <code>.pttd</code> file:
+    </p>
+    <pre><code>project.pttd                          <span class="sc">; the live file</span>
+ptt_backups/
+    project.pttd.20260402-102700.bak  <span class="sc">; earlier save</span>
+    project.pttd.20260402-103415.bak  <span class="sc">; most recent backup</span></code></pre>
+    <p>
+      No backup is created on the very first save (when the file does not yet exist).
+      The backup folder is created automatically if it does not exist.
+      If the backup folder is left blank, backups are placed in the same directory as the
+      <code>.pttd</code> file.
+    </p>
+    <p>
+      When the number of existing backups reaches <code>backups_max_int</code>, the oldest
+      backup is deleted before the new one is written. The oldest backup is determined by
+      the timestamp embedded in the filename, so the ordering is reliable regardless of OS
+      file timestamps. Set <code>backups_max_int</code> to 0 or less for unlimited backups.
+    </p>
+    <p>
+      Backup behaviour is controlled by three keys in the <code>[BACKUPS]</code> section of
+      <code>pttedit.ini</code>:
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Key</th><th>Default</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>backups_on_bool</code></td>
+            <td><code>True</code></td>
+            <td>Enable or disable backup on save. Set to <code>False</code> to turn off backups entirely.</td>
+          </tr>
+          <tr>
+            <td><code>backups_folder</code></td>
+            <td><code>ptt_backups</code></td>
+            <td>
+              Subfolder name for backup files, relative to the <code>.pttd</code> file location.
+              Spaces are allowed (quotes are optional). Leave blank to place backups in the
+              same folder as the <code>.pttd</code> file.
+            </td>
+          </tr>
+          <tr>
+            <td><code>backups_max_int</code></td>
+            <td><code>100</code></td>
+            <td>
+              Maximum number of backup copies to keep. When the limit is reached, the oldest
+              backup is deleted before a new one is written. Set to <code>0</code> or less
+              for unlimited backups.
             </td>
           </tr>
         </tbody>
@@ -1246,9 +1314,133 @@ StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
     </div>
   </section>
 
-  <!-- 8. KEYBOARD SHORTCUTS -->
+  <!-- 8. EDIT MENU (FIND & RENAME) -->
+  <section class="section" id="edit-menu">
+    <h2><span class="section-num">8</span>Edit Menu (Find &amp; Rename)</h2>
+
+    <p>
+      The <strong>Edit</strong> menu provides Find and Rename commands for locating and
+      bulk-renaming text across the timeline grid.
+    </p>
+
+    <h3>Find &nbsp;<kbd>Ctrl</kbd>+<kbd>F</kbd></h3>
+    <p>
+      Opens the <strong>Find</strong> dialog, which searches the Process, Task, Start-&fnof;,
+      and End-&fnof; columns for literal text.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Control</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Search text</strong></td>
+            <td>The literal string to search for. Search is performed against formula text, not evaluated values.</td>
+          </tr>
+          <tr>
+            <td><strong>Case Sensitive</strong></td>
+            <td>When checked, the search distinguishes uppercase from lowercase.</td>
+          </tr>
+          <tr>
+            <td><strong>Selected Rows</strong></td>
+            <td>
+              Limits the search to a subset of rows. Accepts flexible range syntax:
+              <code>1-N</code> (all rows), <code>3-10</code>, <code>1,2,5</code>,
+              <code>1-20,30,50-60</code>, <code>5-</code> (row 5 to end).
+              Defaults to <code>1-N</code>.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Find Next / Find Previous</strong></td>
+            <td>Navigate matches one at a time with wrap-around. The status line shows the match count.</td>
+          </tr>
+          <tr>
+            <td><strong>Find All</strong></td>
+            <td>Opens the <strong>Find All Results</strong> window listing every match.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Find All Results Window</h3>
+    <p>
+      The Find All Results window is modeless (stays open while you edit). Each result is
+      displayed in <code>Process:Task.column: formula</code> format with the matched text
+      highlighted in yellow. Click any result to navigate the grid to that cell; the clicked
+      result grays its background as a visual indicator. A <strong>Refresh</strong> button
+      re-runs the search against the current grid contents.
+    </p>
+
+    <h3>Rename &nbsp;<kbd>Ctrl</kbd>+<kbd>R</kbd></h3>
+    <p>
+      Opens the <strong>Rename</strong> dialog for atomically renaming a Process Name or a
+      Process:Task Name across the entire file without breaking existing formula references.
+    </p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Control</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Scope</strong></td>
+            <td>
+              <strong>Process Names</strong> &mdash; renames cells in the Process column and
+              updates the process-name portion of all Start-&fnof;/End-&fnof; formula tokens.<br>
+              <strong>Process:Task Names</strong> &mdash; renames the definition row and all
+              formula references; also handles blank-process variable references
+              (e.g. <code>:VarName</code>).
+            </td>
+          </tr>
+          <tr>
+            <td><strong>From / To</strong></td>
+            <td>
+              The current name and the desired replacement name. Both are validated against
+              the naming rules (alphanumeric and underscore only for Process/Task names)
+              with clear inline error messages.
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Selected Rows</strong></td>
+            <td>
+              Limits the rename to a subset of rows using the same range syntax as Find.
+              Defaults to <code>1-N</code> (all rows).
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Preview All</strong></td>
+            <td>Opens the <strong>Rename Preview</strong> window showing every cell that will change before committing.</td>
+          </tr>
+          <tr>
+            <td><strong>Rename All</strong></td>
+            <td>Commits all changes immediately without previewing.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Rename Preview Window</h3>
+    <p>
+      The Rename Preview window lists every cell that will change. The original text is
+      highlighted in yellow and the replacement text in light blue. Click any result row to
+      navigate the grid to that cell; both the before and after lines gray on click for
+      visual feedback. A <strong>Rename All</strong> button at the bottom commits the
+      changes directly from the preview without returning to the Rename dialog.
+    </p>
+
+    <div class="note">
+      <strong>Note:</strong> Rename updates are atomic &mdash; all affected cells are
+      changed in a single operation. The file is marked modified after a rename; save to
+      make the changes permanent.
+    </div>
+  </section>
+
+  <!-- 9. KEYBOARD SHORTCUTS -->
   <section class="section" id="keyboard">
-    <h2><span class="section-num">8</span>Keyboard Shortcuts</h2>
+    <h2><span class="section-num">9</span>Keyboard Shortcuts</h2>
 
     <div class="table-wrap">
       <table>
@@ -1263,6 +1455,14 @@ StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
           <tr>
             <td><kbd>Ctrl</kbd>+<kbd>S</kbd></td>
             <td>Save the current file (Save As if unsaved)</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>F</kbd></td>
+            <td>Open the Find dialog</td>
+          </tr>
+          <tr>
+            <td><kbd>Ctrl</kbd>+<kbd>R</kbd></td>
+            <td>Open the Rename dialog</td>
           </tr>
           <tr>
             <td><kbd>Tab</kbd></td>
@@ -1311,9 +1511,9 @@ StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
     </div>
   </section>
 
-  <!-- 9. LAUNCHING PTTPLOT -->
+  <!-- 10. LAUNCHING PTTPLOT -->
   <section class="section" id="launching">
-    <h2><span class="section-num">9</span>Launching PTTPlot</h2>
+    <h2><span class="section-num">10</span>Launching PTTPlot</h2>
 
     <p class="menu-path">
       <span class="menu-item">View</span>
@@ -1374,9 +1574,9 @@ StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
     </div>
   </section>
 
-  <!-- 10. STATUS BAR -->
+  <!-- 11. STATUS BAR -->
   <section class="section" id="status-bar">
-    <h2><span class="section-num">10</span>Status Bar</h2>
+    <h2><span class="section-num">11</span>Status Bar</h2>
 
     <p>
       The status bar runs along the bottom edge of the PTTEdit window and provides
@@ -1459,9 +1659,9 @@ StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
     </div>
   </section>
 
-  <!-- 11. HELP MENU -->
+  <!-- 12. HELP MENU -->
   <section class="section" id="help-menu">
-    <h2><span class="section-num">11</span>Help Menu</h2>
+    <h2><span class="section-num">12</span>Help Menu</h2>
 
     <p>The <strong>Help</strong> menu provides access to reference documentation, keyboard controls, and version and environment information.</p>
 
@@ -1502,7 +1702,7 @@ StartTimeFormula: Max(End(Branch1:Build), End(Branch2:Build))</code></pre>
 
   <!-- FOOTER -->
   <footer>
-    <strong>PTTimeline v0.4.0-dev</strong> &mdash; PTTEdit User Guide
+    <strong>PTTimeline v0.5.0-dev</strong> &mdash; PTTEdit User Guide
   </footer>
 
 </div>

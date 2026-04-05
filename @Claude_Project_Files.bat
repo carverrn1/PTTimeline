@@ -20,47 +20,56 @@ if exist "%target_folder%" (
 echo Creating fresh folder: %target_folder%
 mkdir "%target_folder%"
 
+:: Update PTTimeline_Issues.md (markdown) for Claude
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File ".\make_issues_markdown.ps1"
+copy /y PTTimeline_Issues.md "%target_folder%"
+
+:: Development & Build files
+copy /y *.bat "%target_folder%"
+copy /y *.ps1 "%target_folder%"
+copy /y _*.py "%target_folder%"
+
 :: Support Files
-copy Claude_Project_Files.bat "%target_folder%"
-copy DECISIONS.md "%target_folder%"
-copy PTTimeline_Program_Files_Layout.txt "%target_folder%"
+copy /y *.md "%target_folder%"
+copy /y *.txt "%target_folder%"
+
+:: Release Notes
+copy /y "Releases\*.md" "%target_folder%"
+
+:: Example app INI files (defaults)
+copy /y "INI\*.ini" "%target_folder%"
 
 :: Source Files
-copy requirements.txt "%target_folder%"
-copy pttedit.py "%target_folder%"
-copy pttplot.py "%target_folder%"
-copy pttview.py "%target_folder%"
-copy "lib\pttedit_delegates.py" "%target_folder%"
-copy "lib\pttedit_expression_evaluator.py" "%target_folder%"
-copy "lib\ptt_config.py" "%target_folder%"
-copy "lib\ptt_appinfo.py" "%target_folder%"
-copy "lib\ptt_debugging.py" "%target_folder%"
-copy "lib\ptt_splash.py" "%target_folder%"
+copy /y requirements.txt "%target_folder%"
+copy /y pttedit.py "%target_folder%"
+copy /y pttplot.py "%target_folder%"
+copy /y pttview.py "%target_folder%"
+copy /y "lib\*.py" "%target_folder%"
 
-REM copy resources\*.ico "%target_folder%"
+REM copy /y resources\*.ico "%target_folder%"
 
-copy docs\*_UserGuide.html "%target_folder%"
+copy /y docs\*_UserGuide.html "%target_folder%"
 
-copy samples\Test*.* "%target_folder%"
-copy samples\robotic_pipettor*.* "%target_folder%"
+copy /y samples\Test*.* "%target_folder%"
+copy /y samples\robotic_pipettor*.* "%target_folder%"
 
 :: Build files
-copy build_all.bat "%target_folder%"
+copy /y build_all.bat "%target_folder%"
 
 :: PyInstaller Files
-copy build_exe.bat "%target_folder%"
-copy build_exe_pyinstaller.bat "%target_folder%"
-copy build_exe_folders.bat "%target_folder%"
-copy PTTimeline.spec "%target_folder%"
+copy /y build_exe.bat "%target_folder%"
+copy /y build_exe_pyinstaller.bat "%target_folder%"
+copy /y build_exe_folders.bat "%target_folder%"
+copy /y PTTimeline.spec "%target_folder%"
 
 :: Inno Setup Files
-copy build_install.bat "%target_folder%"
-copy *.VersionInfo "%target_folder%"
-copy PTTimeline.iss "%target_folder%"
-copy license.txt "%target_folder%"
+copy /y build_install.bat "%target_folder%"
+copy /y *.VersionInfo "%target_folder%"
+copy /y PTTimeline.iss "%target_folder%"
+copy /y license.txt "%target_folder%"
 
 :: Cleanup unwanted files
-del "%target_folder%"\*.bak
+del "%target_folder%"\*.bak*
 
 
 :: Open the folder

@@ -10,16 +10,16 @@ to the following files:
     PTTimeline.iss
 
 Also auto-increments the build number (APP_VERSION_INFO 5th element) in
-ptt_appinfo.py itself when a suffix is present.  The build number uses the
-pattern YYMMDD## where YYMMDD is today's date and ## is a two-digit
-sequence (01-99, wraps to 00 with a warning).
+ptt_appinfo.py itself when a suffix AND a build number are present.
 
 Rules:
-  - No suffix / no suffix number  -> ptt_appinfo.py left untouched
-  - Suffix present, no number     -> number added as YYMMDD01
-  - Suffix + number, date matches -> sequence incremented
-  - Suffix + number, date differs -> date updated, sequence reset to 01
-  - ## reaches 99 and wraps       -> wraps to 00, warning printed
+  - No suffix (3-element)         -> ptt_appinfo.py left untouched; "v1.0.0"
+  - Suffix, no number (4-element) -> ptt_appinfo.py left untouched; "v0.5.0-dev"
+  - Suffix + number (5-element)   -> number incremented by 1; "v0.5.0-dev.N"
+  - Number wraps past 65535       -> wraps to 1, warning printed
+
+To start numbered builds: manually add the 5th element set to 0 (e.g. (0, 5, 0, "dev", 0)); the first build run will increment it to 1.
+To stop numbering: manually remove the 5th element from the tuple.
 
 Invoked as the first step in BUILD_ALL.BAT before PyInstaller runs.
 
@@ -57,11 +57,11 @@ def _update_appinfo() -> None:
     """
     Update ptt_appinfo.py in place:
       - APP_DATE is always set to today's date (YYYY-MM-DD).
-      - APP_VERSION_INFO build number (5th element) is incremented when a
-        suffix is present, as a plain counter from 1 to 65535, then wrapping
-        back to 1 with a warning.  No-suffix (stable)
-        tuples are left untouched for APP_VERSION_INFO but APP_DATE is still
-        updated.
+      - APP_VERSION_INFO build number (5th element) is incremented by 1 only
+        when a 5-element tuple (suffix + number) is present.  3-element (no
+        suffix) and 4-element (suffix only) tuples are left untouched — APP_DATE
+        is still updated in all cases.  To begin a numbered build sequence,
+        manually set the 5th element to 0; the first build run increments it to 1.
 
     Reads and writes the file directly (bypassing .pyc cache) so repeated
     runs within the same Python process always see the current on-disk state.
@@ -91,7 +91,7 @@ def _update_appinfo() -> None:
         text
     )
     if not m:
-        # No suffix present (stable release) — write APP_DATE update if needed and stop
+        # 3-element tuple (no suffix) — write APP_DATE update if needed and stop
         if text != appinfo_path.read_text(encoding="utf-8"):
             appinfo_path.write_text(text, encoding="utf-8")
             with open(appinfo_path, encoding="utf-8") as _f:
@@ -105,16 +105,19 @@ def _update_appinfo() -> None:
     suf_num_ = int(m.group(5)) if m.group(5) is not None else None
 
     if suf_num_ is None:
-        # No number yet — start at 1
-        new_suf_num = 1
-        wrapped     = False
-    else:
-        new_suf_num = suf_num_ + 1
-        wrapped     = new_suf_num > 65535
-        if wrapped:
-            new_suf_num = 1
+        # 4-element tuple (suffix only, no number) — leave APP_VERSION_INFO
+        # untouched; write APP_DATE update if needed and stop.
+        if text != appinfo_path.read_text(encoding="utf-8"):
+            appinfo_path.write_text(text, encoding="utf-8")
+            with open(appinfo_path, encoding="utf-8") as _f:
+                exec(compile(_f.read(), str(appinfo_path), "exec"), ptt_appinfo.__dict__)
+        return
 
+    # 5-element tuple — increment the build number.
+    new_suf_num = suf_num_ + 1
+    wrapped     = new_suf_num > 65535
     if wrapped:
+        new_suf_num = 1
         print(f"  WARNING: ptt_appinfo.py: build counter wrapped from 65535 to 1")
 
     # Build replacement strings
@@ -287,12 +290,12 @@ def update_iss(v: dict, filename: str = "PTTimeline.iss") -> None:
         report(filename, "#define AppVerName", old_full, new_full)
         text = text[:m.start()] + new_full + text[m.end():]
 
-    # 4. OutputBaseFilename       =PTTimeline-x.x.x...-setup
-    pattern = r'(OutputBaseFilename\s*=\s*)PTTimeline-[^\r\n]+'
+    # 4. OutputBaseFilename       =PTTimeline_x.x.x..._setup
+    pattern = r'(OutputBaseFilename\s*=\s*)PTTimeline_[^\r\n]+'
     m = re.search(pattern, text)
     if m:
         old_full = m.group(0)
-        new_full = m.group(1) + f"PTTimeline-{ver_iss}-setup"
+        new_full = m.group(1) + f"PTTimeline_{ver_iss}_setup"
         report(filename, "OutputBaseFilename", old_full, new_full)
         text = text[:m.start()] + new_full + text[m.end():]
 

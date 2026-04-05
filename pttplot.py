@@ -52,7 +52,8 @@ def show_splash():
 # Setup program name and version information
 PROGRAM_FILENAME = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 capitalize_first_four = lambda s: s[:4].upper() + s[4:]     # Capitalize first 4 letters
-from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID
+from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID, APP_REPO_URL
+from ptt_utils import html_to_plain_text, build_issue_url, get_os_info, backup_file_on_save
 PROGRAM_NAME    = capitalize_first_four(PROGRAM_FILENAME)
 PACKAGE_NAME    = APP_PACKAGE
 
@@ -71,7 +72,7 @@ DEFAULT_CONFIG = """\
 app_package=PTTimeline
 app_name=PTTPlot
 app_version=0.0.0
-ini_version=1
+ini_version=2
 
 [DEBUGGING]
 enabled_bool=False
@@ -85,6 +86,16 @@ pdf_viewer_py=pttview.py
 pdf_viewer_exe=pttview.exe
 svg_viewer_py=pttview.py
 svg_viewer_exe=pttview.exe
+
+[BACKUPS]
+; backups_on_bool  - Enable or disable backup on save.
+backups_on_bool=True
+; backups_folder   - Subfolder for backup files, relative to the .pttp file location.
+;                    Leave blank to place backups in the same folder as the .pttp file.
+backups_folder=ptt_backups
+; backups_max_int  - Maximum number of backup files to keep. Oldest are deleted when
+;                    the limit is reached. Set to 0 or less for unlimited backups.
+backups_max_int=100
 
 [PLOTTING]
 window_maximized_bool=False
@@ -443,8 +454,14 @@ CONFIG_ANNOTATIONS_MARKERS_FONTSTYLE_CHOICES    = ['Normal', 'Bold', 'Italic', '
 # Runtime config dict — populated by load_ini() at startup
 config = {}
 
+# Recent files managers — populated in __main__ after INI path is known
+recent_files_pttd: 'RecentFiles | None' = None   # File menu  (.pttd)
+recent_files_pttp: 'RecentFiles | None' = None   # Presentation menu (.pttp)
 
-from ptt_config import load_plot_config, _apply_ini_config, _make_parser
+RECENT_FILES_MAX = 15
+
+from ptt_config import load_plot_config, _apply_ini_config, _make_parser, get_user_ini_path
+from ptt_recent_files import RecentFiles
 from ptt_debugging import Debugging, CrashLogger
 debugging_enabled = False
 debugging_filename = None
@@ -1469,7 +1486,10 @@ class MainWindow(QMainWindow):
         file_open_action = QAction('&Open', self)
         file_open_action.triggered.connect(self.file_open_dialog)
         file_menu.addAction(file_open_action)
-        
+
+        self.file_open_recent_menu = file_menu.addMenu('Open &Recent')
+        self.file_open_recent_menu.aboutToShow.connect(self._rebuild_recent_pttd_menu)
+
         file_save_menu = file_menu.addMenu('&Save')
 
         for fmt, label, ext, file_filter in [
@@ -1498,6 +1518,10 @@ class MainWindow(QMainWindow):
         self.presentation_open_action.triggered.connect(self.presentation_open_dialog)
         self.presentation_open_action.setEnabled(False)
         presentation_menu.addAction(self.presentation_open_action)
+
+        self.presentation_open_recent_menu = presentation_menu.addMenu('Open &Recent')
+        self.presentation_open_recent_menu.aboutToShow.connect(self._rebuild_recent_pttp_menu)
+        self.presentation_open_recent_menu.setEnabled(False)
 
         self.presentation_save_action = QAction('&Save...', self)
         self.presentation_save_action.triggered.connect(self.presentation_save_dialog)
@@ -1640,6 +1664,28 @@ class MainWindow(QMainWindow):
         help_sysinfo_action = QAction('&System Information', self)
         help_sysinfo_action.triggered.connect(self.show_system_info)
         help_menu.addAction(help_sysinfo_action)
+
+        help_menu.addSeparator()
+
+        support_menu = help_menu.addMenu('S&upport')
+
+        support_discussions_action = QAction('&Discussions', self)
+        support_discussions_action.triggered.connect(self.open_discussions)
+        support_menu.addAction(support_discussions_action)
+
+        support_issues_action = QAction('&Issues', self)
+        support_issues_action.triggered.connect(self.open_issues)
+        support_menu.addAction(support_issues_action)
+
+        support_menu.addSeparator()
+
+        support_bug_action = QAction('Submit &Bug Report', self)
+        support_bug_action.triggered.connect(self.submit_bug_report)
+        support_menu.addAction(support_bug_action)
+
+        support_feature_action = QAction('Submit &Feature Request', self)
+        support_feature_action.triggered.connect(self.submit_feature_request)
+        support_menu.addAction(support_feature_action)
         
         debugging.leave()
         return
@@ -1995,6 +2041,7 @@ class MainWindow(QMainWindow):
         self.presentation_open_action.setEnabled(True)
         self.presentation_save_action.setEnabled(True)
         self.presentation_process_attributes_action.setEnabled(True)
+        self.presentation_open_recent_menu.setEnabled(True)
 
         # Refresh menu states to reflect new configuration
         self.refresh_menu_states()
@@ -2005,6 +2052,12 @@ class MainWindow(QMainWindow):
 
         # File loaded successfully — enable file monitoring
         self.file_monitoring_enabled = True
+
+        # Update recent files lists
+        if recent_files_pttd is not None and self.pttd_file_name:
+            recent_files_pttd.add(self.pttd_file_name)
+        if recent_files_pttp is not None and self.pttp_file_name:
+            recent_files_pttp.add(self.pttp_file_name)
 
         debugging.leave()
         
@@ -2049,11 +2102,64 @@ class MainWindow(QMainWindow):
         debugging.print("Menu states refreshed to match current configuration")
         debugging.leave()
     
+    def _rebuild_recent_pttd_menu(self):
+        """Repopulate the File → Open Recent submenu just before it is shown."""
+        if recent_files_pttd is None:
+            return
+        self.file_open_recent_menu.clear()
+        new_menu = recent_files_pttd.build_menu(self, self._open_recent_pttd)
+        for action in new_menu.actions():
+            self.file_open_recent_menu.addAction(action)
+
+    def _rebuild_recent_pttp_menu(self):
+        """Repopulate the Presentation → Open Recent submenu just before it is shown."""
+        if recent_files_pttp is None:
+            return
+        self.presentation_open_recent_menu.clear()
+        new_menu = recent_files_pttp.build_menu(self, self._open_recent_pttp)
+        for action in new_menu.actions():
+            self.presentation_open_recent_menu.addAction(action)
+
+    def _open_recent_pttd(self, file_path: str):
+        """Open a .pttd file chosen from the File → Open Recent submenu."""
+        debugging.enter(f'file_path={file_path}')
+        if not os.path.isfile(file_path):
+            QMessageBox.warning(self, 'File Not Found',
+                f'The file no longer exists:\n{file_path}')
+            debugging.leave('File not found')
+            return
+        try:
+            self.file_name = file_path
+            self.load_and_plot(self.file_name)
+            self.setup_file_watcher()
+        except Exception as e:
+            self.file_name = None
+            QMessageBox.critical(self, 'Error',
+                f'An error occurred while reading the file: {e}')
+        debugging.leave()
+
+    def _open_recent_pttp(self, file_path: str):
+        """Open a .pttp file chosen from the Presentation → Open Recent submenu."""
+        debugging.enter(f'file_path={file_path}')
+        if not os.path.isfile(file_path):
+            QMessageBox.warning(self, 'File Not Found',
+                f'The file no longer exists:\n{file_path}')
+            debugging.leave('File not found')
+            return
+        try:
+            self.load_and_plot(file_path)
+            self.setup_file_watcher()
+        except Exception as e:
+            QMessageBox.critical(self, 'Error',
+                f'An error occurred loading the presentation: {e}')
+        debugging.leave()
+
     def file_open_dialog(self):
         debugging.enter()
         while True:
             file_name, _ = QFileDialog.getOpenFileName(
-                self, "Open PTTimeline File", "",
+                self, "Open PTTimeline File",
+                recent_files_pttd.get_dialog_dir() if recent_files_pttd else "",
                 "PTTimeline Data Files (*.pttd)")
             if not file_name:
                 break  # user cancelled
@@ -2364,20 +2470,7 @@ class MainWindow(QMainWindow):
     def show_about(self):
         """Display About dialog with version and copyright information"""
         debugging.enter()
-        
-        # Create a custom message box instead of using QMessageBox.about()
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(f"About {PROGRAM_NAME}")
-        
-        # Load and set the icon (adjust path as needed)
-        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
-        if os.path.isfile(icon_path):
-            icon = QIcon(icon_path)
-            msg_box.setIconPixmap(icon.pixmap(48, 48))  # pixel display size
-        else:
-            # Fallback to default info icon if file not found
-            msg_box.setIcon(QMessageBox.Information)
-        
+
         about_text = f"""
             <h2>{PROGRAM_NAME}</h2>
             <p><b>Version:</b> {APP_VERSION}</p>
@@ -2387,17 +2480,58 @@ class MainWindow(QMainWindow):
             <p><b>Date:</b> {APP_DATE}</p>
             <p>{APP_COPYRIGHT}</p>
             """
-        msg_box.setText(about_text)
-        msg_box.setTextFormat(Qt.RichText)
-        msg_box.exec()
-        
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"About {PROGRAM_NAME}")
+
+        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
+        icon_exists = os.path.isfile(icon_path)
+        if icon_exists:
+            icon = QIcon(icon_path)
+            dlg.setWindowIcon(icon)
+
+        icon_label = QLabel()
+        if icon_exists:
+            icon_label.setPixmap(icon.pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignTop)
+
+        content = QLabel()
+        content.setTextFormat(Qt.RichText)
+        content.setText(about_text)
+        content.setWordWrap(True)
+        content.setOpenExternalLinks(True)
+
+        body_layout = QHBoxLayout()
+        body_layout.addWidget(icon_label)
+        body_layout.addWidget(content)
+
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        close_btn.setDefault(True)
+
+        def copy_to_clipboard():
+            QApplication.clipboard().setText(html_to_plain_text(about_text))
+            copy_btn.setText("Copied")
+            QTimer.singleShot(1500, lambda: copy_btn.setText("Copy to Clipboard"))
+
+        copy_btn.clicked.connect(copy_to_clipboard)
+        close_btn.clicked.connect(dlg.accept)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout = QVBoxLayout(dlg)
+        layout.addLayout(body_layout)
+        layout.addLayout(btn_layout)
+
+        dlg.exec()
         debugging.leave()
 
 
-    def show_system_info(self):
-        """Display System Information dialog with Python and module versions"""
-        debugging.enter()
-
+    def _build_sysinfo_html(self) -> str:
+        """Build and return the System Information HTML string."""
         # Get Python version
         python_version, python_details = sys.version.split(' ', 1)
         python_build, python_compile = python_details.split(') [', 1)
@@ -2414,31 +2548,12 @@ class MainWindow(QMainWindow):
             except Exception:
                 module_versions.append(f"<tr><td>&nbsp;&nbsp;{module_name}</td><td>&nbsp;<i>(version not found)</i></td></tr>")
 
-        # Get OS information with Windows 11 detection
+        os_info      = get_os_info()
         platform_str = platform.platform()
-        os_name = platform.system()
-        os_release = platform.release()
+        current_dir  = os.getcwd()
+        script_path  = os.path.dirname(os.path.abspath(__file__))
 
-        # Check if Windows 11 based on build number
-        if os_name == "Windows" and os_release == "10":
-            # Format: Windows-10-10.0.BUILDNUMBER-SP0
-            build_match = re.search(r'10\.0\.(\d+)', platform_str)
-            if build_match:
-                build_num = int(build_match.group(1))
-                if build_num >= 22000:  # Windows 11 starts at build 22000
-                    os_info = f"Windows 11 (Build {build_num})"
-                else:
-                    os_info = f"Windows 10 (Build {build_num})"
-            else:
-                os_info = f"{os_name} {os_release}"
-        else:
-            os_info = f"{os_name} {os_release}"
-
-        # Get file paths
-        current_dir = os.getcwd()
-        script_path = os.path.dirname(os.path.abspath(__file__))
-
-        sysinfo_text = f"""
+        return f"""
             <h3>System Information</h3>
             <p><b>Application:</b> {PROGRAM_NAME} v{APP_VERSION}</p>
 
@@ -2446,8 +2561,7 @@ class MainWindow(QMainWindow):
             <p><b>Platform:</b> {platform_str}</p>
 
             <p><b>Python Version:</b> {python_version}<br>&nbsp;&nbsp;{python_build}<br>&nbsp;&nbsp;{python_compile}</p>
-            <p><b>Third-Party Packages:</b></p
-            >
+            <p><b>Third-Party Packages:</b></p>
             <table border="0" cellpadding="0">
             {''.join(module_versions)}
             </table>
@@ -2461,11 +2575,102 @@ class MainWindow(QMainWindow):
             <tr><td><b>Debug<br>Logging:</b></td><td><b>Enabled:</b> {debugging_enabled}<br><b>File:</b> {os.path.basename(debugging_filename) if debugging_filename else 'None'}</td></tr>
             </table>
             """
-        QMessageBox.about(self, "System Information", sysinfo_text)
+
+    def show_system_info(self):
+        """Display System Information dialog with Python and module versions"""
+        debugging.enter()
+
+        sysinfo_text = self._build_sysinfo_html()
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("System Information")
+
+        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
+        icon_exists = os.path.isfile(icon_path)
+        if icon_exists:
+            icon = QIcon(icon_path)
+            dlg.setWindowIcon(icon)
+
+        icon_label = QLabel()
+        if icon_exists:
+            icon_label.setPixmap(icon.pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignTop)
+
+        content = QLabel()
+        content.setTextFormat(Qt.RichText)
+        content.setText(sysinfo_text)
+        content.setWordWrap(True)
+
+        body_layout = QHBoxLayout()
+        body_layout.addWidget(icon_label)
+        body_layout.addWidget(content)
+
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        close_btn.setDefault(True)
+
+        def copy_to_clipboard():
+            QApplication.clipboard().setText(html_to_plain_text(sysinfo_text))
+            copy_btn.setText("Copied")
+            QTimer.singleShot(1500, lambda: copy_btn.setText("Copy to Clipboard"))
+
+        copy_btn.clicked.connect(copy_to_clipboard)
+        close_btn.clicked.connect(dlg.accept)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout = QVBoxLayout(dlg)
+        layout.addLayout(body_layout)
+        layout.addLayout(btn_layout)
+
+        dlg.exec()
+        debugging.leave()
+
+    def open_discussions(self):
+        """Open the PTTimeline GitHub Discussions page in the default browser."""
+        webbrowser.open_new_tab(f"{APP_REPO_URL}/discussions")
+
+    def open_issues(self):
+        """Open the PTTimeline GitHub Issues page in the default browser."""
+        webbrowser.open_new_tab(f"{APP_REPO_URL}/issues")
+
+    def submit_bug_report(self):
+        """Open a pre-filled GitHub bug report issue form in the default browser."""
+        debugging.enter()
+        try:
+            context = {
+                "Which Application(s)?": PROGRAM_NAME,
+                "Version":               f"v{APP_VERSION}",
+                "Operating System":      get_os_info(),
+                "System Information":    html_to_plain_text(self._build_sysinfo_html()),
+            }
+            url = build_issue_url(APP_REPO_URL, "bug_report.md", context)
+            webbrowser.open_new_tab(url)
+        except Exception as e:
+            QMessageBox.warning(self, "Network Error",
+                f"Could not reach GitHub to open the bug report form.\n\nPlease check your internet connection and try again.\n\nDetails: {e}")
+        debugging.leave()
+
+    def submit_feature_request(self):
+        """Open a pre-filled GitHub feature request issue form in the default browser."""
+        debugging.enter()
+        try:
+            context = {
+                "Which application(s)?": PROGRAM_NAME,
+                "Version":               f"v{APP_VERSION}",
+                "Operating System":      get_os_info(),
+            }
+            url = build_issue_url(APP_REPO_URL, "feature_request.md", context)
+            webbrowser.open_new_tab(url)
+        except Exception as e:
+            QMessageBox.warning(self, "Network Error",
+                f"Could not reach GitHub to open the feature request form.\n\nPlease check your internet connection and try again.\n\nDetails: {e}")
         debugging.leave()
 
     def show_user_guide(self):
-        """Open the PTTPlot User Guide HTML file in the default browser."""
         guide_path = Path(_APP_DIR) / "docs" / "PTTPlot_UserGuide.html"
         if guide_path.is_file():
             webbrowser.open_new_tab(guide_path.as_uri())
@@ -2743,7 +2948,7 @@ def load_file_ini(pttd_filename):
     debugging.print(f"Per-file INI applied: {ini_filename}")
     debugging.leave()
 
-def save_pttp_config(pttp_filename):
+def save_pttp_config(pttp_filename, make_backup=True):
     """
     Write the current config to a .pttp INI file.
     Called when auto-creating a default sample.{}.pttp alongside a .pttd file.
@@ -2751,10 +2956,30 @@ def save_pttp_config(pttp_filename):
     application-level settings, not per-file presentation settings.
     PROCESS_ATTRIBUTES is handled separately with its own comment header and
     one entry per process in palette order (color expressed as hex).
-    """
-    SKIP_SECTIONS = {'META', 'DEBUGGING', 'EXTERNAL_PROGRAMS', CONFIG_PROCESS_ATTRIBUTES_OPTIONS}
 
-    debugging.enter(f'pttp_filename={pttp_filename}')
+    Parameters
+    ----------
+    pttp_filename:
+        Destination path for the .pttp file.
+    make_backup:
+        When True (default), a timestamped backup is created if the
+        file already exists and backups_on_bool is enabled in config.
+        Pass False for auto-creation paths where no prior file exists.
+    """
+    SKIP_SECTIONS = {'META', 'DEBUGGING', 'EXTERNAL_PROGRAMS', 'BACKUPS',
+                     CONFIG_PROCESS_ATTRIBUTES_OPTIONS, 'ANNOTATIONS.MARKERS'}
+
+    debugging.enter(f'pttp_filename={pttp_filename}, make_backup={make_backup}')
+
+    if make_backup and config['BACKUPS']['backups_on_bool'] and os.path.isfile(pttp_filename):
+        try:
+            backup_file_on_save(pttp_filename, config['BACKUPS']['backups_folder'], config['BACKUPS']['backups_max_int'])
+        except Exception as e:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(None, 'Backup Error',
+                f'Failed to create backup of:\n{pttp_filename}\n\nError: {e}\n\nThe file was not saved.')
+            debugging.leave()
+            return
 
     pttp_cfg = _make_parser()
     for section, keys in config.items():
@@ -2766,9 +2991,68 @@ def save_pttp_config(pttp_filename):
                 continue
             pttp_cfg.set(section, key, str(value))
 
+    def _serialize_marker(m):
+        """
+        Serialize a marker dict back to the INI line value format:
+          label=...; time=...; linestyle=...; linewidth_float=...; color=...;
+          fontsize_float=...; fontstyle=...; position=...; rotation_float=...
+        Field order matches the documented format.
+        """
+        # time: reconstruct formula or literal float
+        if m['time'] is None:
+            edge, proc, task = m['time_ref']
+            func = 'Start' if edge == 'start' else 'End'
+            time_str = f'{func}({proc}:{task})'
+        else:
+            time_str = str(m['time'])
+
+        # fontstyle: reverse _parse_fontstyle — (fontweight, fontstyle) -> display string
+        fw = m.get('fontweight', 'normal')
+        fs = m.get('fontstyle', 'normal')
+        if fw == 'bold' and fs == 'italic':
+            fontstyle_str = 'Bold Italic'
+        elif fw == 'bold':
+            fontstyle_str = 'Bold'
+        elif fs == 'italic':
+            fontstyle_str = 'Italic'
+        else:
+            fontstyle_str = 'Normal'
+
+        # position: reverse _parse_marker_position — float -> display string
+        pos = m.get('position', 1.0)
+        if pos == 1.0:
+            position_str = 'Top'
+        elif pos == 0.0:
+            position_str = 'Bottom'
+        elif pos == 0.5:
+            position_str = 'Center'
+        else:
+            position_str = f'{pos * 100.0:g}%'
+
+        return (
+            f"label={m['name']}; "
+            f"time={time_str}; "
+            f"linestyle={m['linestyle']}; "
+            f"linewidth_float={m['linewidth']}; "
+            f"color={m['color']}; "
+            f"fontsize_float={m['fontsize']}; "
+            f"fontstyle={fontstyle_str}; "
+            f"position={position_str}; "
+            f"rotation_float={m['rotation']}"
+        )
+
     try:
         with open(pttp_filename, 'w', encoding='utf-8') as f:
             pttp_cfg.write(f)
+
+            # Write [ANNOTATIONS.MARKERS] section manually so _markers are
+            # serialized back to INI lines (configparser only knows about
+            # scalar keys; the parsed marker list lives in _markers).
+            f.write('[ANNOTATIONS.MARKERS]\n')
+            markers = config.get('ANNOTATIONS.MARKERS', {}).get('_markers', [])
+            for m in markers:
+                f.write(f"{m['key']} = {_serialize_marker(m)}\n")
+            f.write('\n')
 
             # Write [PROCESS_ATTRIBUTES] section with comment header.
             # One entry per process (palette order); per-process overrides preserved
@@ -2826,7 +3110,7 @@ def load_pttp_config(pttp_filename, auto_discovered=False):
     if not os.path.exists(pttp_filename):
         if auto_discovered:
             debugging.print(f"Auto-discovered PTTP not found — creating: {pttp_filename}")
-            save_pttp_config(pttp_filename)
+            save_pttp_config(pttp_filename, make_backup=False)
         else:
             # Explicitly passed but missing — should have been caught by caller
             debugging.print(f"ERROR: PTTP file not found: {pttp_filename}")
@@ -2904,6 +3188,19 @@ if __name__ == "__main__":
     filename = parse_command_line_args()
     
     load_ini()
+
+    # Initialize recent files managers (INI path is now guaranteed to exist)
+    _pttplot_ini_path = get_user_ini_path(f'{PROGRAM_FILENAME}.ini')
+    recent_files_pttd = RecentFiles(
+        _pttplot_ini_path,
+        section='RECENT_FILES_PTTD',
+        max_entries=RECENT_FILES_MAX,
+    )
+    recent_files_pttp = RecentFiles(
+        _pttplot_ini_path,
+        section='RECENT_FILES_PTTP',
+        max_entries=RECENT_FILES_MAX,
+    )
     
     debugging_enabled = config['DEBUGGING']['enabled_bool']
     debugging_filename = config['DEBUGGING']['filename']

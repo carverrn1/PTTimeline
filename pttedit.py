@@ -31,7 +31,8 @@ def show_splash():
 PROGRAM_FILENAME = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 
 capitalize_first_four = lambda s: s[:4].upper() + s[4:]     # Capitalize first 4 letters
-from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID
+from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID, APP_REPO_URL
+from ptt_utils import html_to_plain_text, build_issue_url, get_os_info, backup_file_on_save
 PROGRAM_NAME    = capitalize_first_four(PROGRAM_FILENAME)
 PACKAGE_NAME    = APP_PACKAGE
 
@@ -40,6 +41,7 @@ USER_CONFIG_PATH = user_config_dir(PACKAGE_NAME, APP_COMPANY)
 USER_LOG_PATH = user_log_dir(PACKAGE_NAME, APP_COMPANY)
 
 import re
+import html
 
 from collections import OrderedDict
 
@@ -58,16 +60,17 @@ import numpy as np
 os.environ['QT_LOGGING_RULES'] = 'qt.qpa.screen.warning=false;qt.qpa.screen.debug=false'
 
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QTableView, QMenuBar, QFileDialog, QVBoxLayout, QWidget, QAbstractItemView, 
+    QApplication, QMainWindow, QTableView, QMenuBar, QFileDialog, QVBoxLayout, QHBoxLayout, QWidget, QAbstractItemView, 
     QMenu, QStyledItemDelegate, QLineEdit, QMessageBox, QCompleter, QMessageBox, QHeaderView, QStyle,
-    QComboBox, QLabel, QSizePolicy
+    QComboBox, QLabel, QSizePolicy, QDialog, QPushButton, QRadioButton, QGroupBox, QTextEdit
     )
-from PySide6.QtCore import Qt, QRegularExpression, QStringListModel, QEvent
+from PySide6.QtCore import Qt, QRegularExpression, QStringListModel, QEvent, QTimer
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QColor, QFont, QAction, QRegularExpressionValidator, QKeySequence, QIcon
 
 QT_ROLES = ['Qt.DisplayRole','Qt.DecorationRole','Qt.EditRole','Qt.ToolTipRole','Qt.StatusTipRole','Qt.WhatsThisRole','Qt.SizeHintRole']
 
 config = {}
+recent_files: 'RecentFiles | None' = None  # Initialized in main() after INI path is known
 
 TIME_UNIT_OPTIONS = ['', 'ns', 'µs', 'ms', 's', 'min', 'hr', 'days']
 
@@ -77,7 +80,7 @@ DEFAULT_CONFIG = """\
 app_package=PTTimeline
 app_name=PTTEdit
 app_version=0.0.0
-ini_version=1
+ini_version=2
 
 [DEBUGGING]
 enabled_bool=False
@@ -87,12 +90,25 @@ filename=pttedit.dbg
 python_exe=python
 plotter_py=pttplot.py
 plotter_exe=pttplot.exe
+
+[BACKUPS]
+; backups_on_bool  - Enable or disable backup on save.
+backups_on_bool=True
+; backups_folder   - Subfolder for backup files, relative to the .pttd file location.
+;                    Leave blank to place backups in the same folder as the .pttd file.
+backups_folder=ptt_backups
+; backups_max_int  - Maximum number of backup files to keep. Oldest are deleted when
+;                    the limit is reached. Set to 0 or less for unlimited backups.
+backups_max_int=100
 """
 
+RECENT_FILES_MAX = 15
 
 
 
-from ptt_config import load_edit_config
+
+from ptt_config import load_edit_config, get_user_ini_path
+from ptt_recent_files import RecentFiles
 from ptt_debugging import Debugging, CrashLogger
 debugging_enabled = False
 debugging_filename = None
@@ -368,6 +384,837 @@ class DataFrameModel(QStandardItemModel):
         debugging.leave()
 
 
+def parse_row_selection(text, row_count):
+    """Parse a row selection string into a sorted list of 0-based row indices.
+
+    Supports:
+        "1-"        open-ended from row 1 to end
+        "5-"        open-ended from row 5 to end
+        "3-10"      closed range, inclusive (1-based)
+        "1,2,5,25"  explicit list (1-based)
+        "1-20,30,50-60"  mixed
+
+    Returns a sorted list of 0-based row indices on success.
+    Raises ValueError with a human-readable message on invalid input or
+    if any referenced row does not exist (i.e. > row_count).
+    """
+    if row_count == 0:
+        return []
+
+    indices = set()
+    # Normalise: collapse whitespace around commas and dashes
+    text = text.strip()
+    if not text:
+        raise ValueError("Row selection is empty.")
+
+    for token in text.split(','):
+        token = token.strip()
+        if not token:
+            continue
+        if '-' in token:
+            parts = token.split('-', 1)
+            start_str = parts[0].strip()
+            end_str   = parts[1].strip()
+            if not start_str.isdigit():
+                raise ValueError(f"Invalid row selection: '{token}'.")
+            start = int(start_str)
+            if end_str == '':
+                # Open-ended: from start to last row
+                end = row_count
+            elif end_str.isdigit():
+                end = int(end_str)
+            else:
+                raise ValueError(f"Invalid row selection: '{token}'.")
+            if start < 1 or end < start:
+                raise ValueError(f"Invalid row selection: '{token}'.")
+            if start > row_count or end > row_count:
+                raise ValueError("One or more rows do not exist.")
+            for r in range(start, end + 1):
+                indices.add(r - 1)   # convert to 0-based
+        else:
+            if not token.isdigit():
+                raise ValueError(f"Invalid row selection: '{token}'.")
+            r = int(token)
+            if r < 1 or r > row_count:
+                raise ValueError("One or more rows do not exist.")
+            indices.add(r - 1)   # convert to 0-based
+
+    return sorted(indices)
+
+
+class FindDialog(QDialog):
+    """Modeless Find dialog for PTTEdit.
+
+    Searches Process, Task, Start-ƒ, and End-ƒ columns for literal text.
+    Navigates to matching cells via Find Next / Find Previous.
+    """
+
+    # Columns searched, in left-to-right display order
+    SEARCH_COLUMNS = [
+        column_index(PROCESS_NAME_HDR),
+        column_index(TASK_NAME_HDR),
+        column_index(START_TIME_FORMULA_HDR),
+        column_index(END_TIME_FORMULA_HDR),
+    ]
+
+    def __init__(self, window):
+        super().__init__(window, Qt.Tool)
+        self.window = window
+        self.setWindowTitle("Find")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        self._find_all_dialog = None  # created once on first Find All
+
+        # --- Find field ---
+        find_label = QLabel("Find what:")
+        self.find_edit = QLineEdit()
+        self.find_edit.setMinimumWidth(280)
+        self.find_edit.returnPressed.connect(self.find_next)
+
+        find_layout = QHBoxLayout()
+        find_layout.addWidget(find_label)
+        find_layout.addWidget(self.find_edit)
+
+        # --- Options ---
+        # An ungrouped QRadioButton with setAutoExclusive(False) acts as a checkbox.
+        self.case_checkbox = QRadioButton("Case sensitive")
+        self.case_checkbox.setAutoExclusive(False)
+
+        options_layout = QHBoxLayout()
+        options_layout.addWidget(self.case_checkbox)
+        options_layout.addStretch()
+
+        # --- Selected Rows field ---
+        rows_label = QLabel("Selected Rows:")
+        self.rows_edit = QLineEdit()
+        self.rows_edit.setMinimumWidth(280)
+        self.rows_edit.setToolTip(
+            "Rows to search. Examples:\n"
+            "  1-      row 1 to end (all rows)\n"
+            "  10-     row 10 to end\n"
+            "  3-10    rows 3 through 10\n"
+            "  1,2,5   rows 1, 2, and 5\n"
+            "  1-20,30 rows 1 through 20, and 30"
+        )
+
+        rows_layout = QHBoxLayout()
+        rows_layout.addWidget(rows_label)
+        rows_layout.addWidget(self.rows_edit)
+
+        # --- Buttons ---
+        self.find_next_btn = QPushButton("Find Next")
+        self.find_next_btn.setDefault(True)
+        self.find_next_btn.clicked.connect(self.find_next)
+
+        self.find_prev_btn = QPushButton("Find Previous")
+        self.find_prev_btn.clicked.connect(self.find_prev)
+
+        find_all_btn = QPushButton("Find All")
+        find_all_btn.clicked.connect(self.find_all)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(find_all_btn)
+        btn_layout.addStretch()
+        btn_layout.addWidget(self.find_prev_btn)
+        btn_layout.addWidget(self.find_next_btn)
+        btn_layout.addWidget(close_btn)
+
+        # --- Status label ---
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: gray;")
+
+        # --- Top-level layout ---
+        layout = QVBoxLayout(self)
+        layout.addLayout(find_layout)
+        layout.addLayout(options_layout)
+        layout.addLayout(rows_layout)
+        layout.addWidget(self.status_label)
+        layout.addLayout(btn_layout)
+
+        self.find_edit.textChanged.connect(self._clear_status)
+        self.rows_edit.textChanged.connect(self._clear_status)
+
+    def _default_rows_text(self):
+        """Return the default Selected Rows string for the current table size."""
+        n = self.window.model.rowCount() if self.window.model else 0
+        return f"1-{n}" if n > 0 else "1-"
+
+    def _get_selected_rows(self):
+        """Parse the Selected Rows field and return a sorted list of 0-based indices.
+        Sets status and returns None on error.
+        """
+        row_count = self.window.model.rowCount() if self.window.model else 0
+        try:
+            return parse_row_selection(self.rows_edit.text(), row_count)
+        except ValueError as e:
+            self._set_status(str(e), error=True)
+            return None
+
+    def find_all(self):
+        """Open (or refresh) the modeless Find All results window."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        if self._find_all_dialog is None:
+            self._find_all_dialog = FindAllDialog(self)
+        self._find_all_dialog.refresh()
+        if self._find_all_dialog.isVisible():
+            self._find_all_dialog.raise_()
+            self._find_all_dialog.activateWindow()
+        else:
+            self._find_all_dialog.show()
+            self._find_all_dialog.raise_()
+            self._find_all_dialog.activateWindow()
+
+    def find_next(self):
+        """Navigate to the next match after the current cell position."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        matches = self._get_all_matches()
+        if matches is None:
+            return   # row selection error already shown
+        if not matches:
+            self._set_status(f'"{search_text}" not found.', error=True)
+            return
+        cur_row, cur_col = self._current_position()
+        for (row, col) in matches:
+            if (row, col) > (cur_row, cur_col):
+                self._navigate_to(row, col)
+                self._set_status(f"Match {matches.index((row, col)) + 1} of {len(matches)}")
+                return
+        self._navigate_to(*matches[0])
+        self._set_status(f"Wrapped. Match 1 of {len(matches)}")
+
+    def find_prev(self):
+        """Navigate to the previous match before the current cell position."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        matches = self._get_all_matches()
+        if matches is None:
+            return   # row selection error already shown
+        if not matches:
+            self._set_status(f'"{search_text}" not found.', error=True)
+            return
+        cur_row, cur_col = self._current_position()
+        for (row, col) in reversed(matches):
+            if (row, col) < (cur_row, cur_col):
+                self._navigate_to(row, col)
+                self._set_status(f"Match {matches.index((row, col)) + 1} of {len(matches)}")
+                return
+        self._navigate_to(*matches[-1])
+        self._set_status(f"Wrapped. Match {len(matches)} of {len(matches)}")
+
+    def _get_all_matches(self):
+        """Return a list of (row, col) tuples for all cells matching the current
+        search text, restricted to the rows specified in the Selected Rows field.
+        Returns None if the row selection is invalid (status already set).
+        """
+        search_text = self.find_edit.text()
+        if not search_text:
+            return []
+        selected_rows = self._get_selected_rows()
+        if selected_rows is None:
+            return None   # validation error already shown
+        case_sensitive = self.case_checkbox.isChecked()
+        model = self.window.model
+        matches = []
+        for row in selected_rows:
+            for col in self.SEARCH_COLUMNS:
+                item = model.item(row, col)
+                if item is None:
+                    continue
+                cell_text = item.text()
+                if case_sensitive:
+                    if search_text in cell_text:
+                        matches.append((row, col))
+                else:
+                    if search_text.lower() in cell_text.lower():
+                        matches.append((row, col))
+        return matches
+
+    def _navigate_to(self, row, col):
+        """Select and scroll to the given cell in the table."""
+        index = self.window.model.index(row, col)
+        self.window.table_view.setCurrentIndex(index)
+        self.window.table_view.scrollTo(index)
+
+    def _current_position(self):
+        """Return the (row, col) of the currently selected cell, or (-1, -1)."""
+        current = self.window.table_view.currentIndex()
+        if current.isValid():
+            return current.row(), current.column()
+        return -1, -1
+
+    def _clear_status(self):
+        self.status_label.setText("")
+        self.status_label.setStyleSheet("color: gray;")
+
+    def _set_status(self, text, error=False):
+        self.status_label.setText(text)
+        self.status_label.setStyleSheet("color: red;" if error else "color: gray;")
+
+    def find_next(self):
+        """Navigate to the next match after the current cell position."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        matches = self._get_all_matches()
+        if not matches:
+            self._set_status(f'"{search_text}" not found.', error=True)
+            return
+        cur_row, cur_col = self._current_position()
+        # Find first match strictly after current position (row-major order)
+        for (row, col) in matches:
+            if (row, col) > (cur_row, cur_col):
+                self._navigate_to(row, col)
+                self._set_status(f"Match {matches.index((row, col)) + 1} of {len(matches)}")
+                return
+        # Wrap around to first match
+        self._navigate_to(*matches[0])
+        self._set_status(f"Wrapped. Match 1 of {len(matches)}")
+
+    def find_prev(self):
+        """Navigate to the previous match before the current cell position."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        search_text = self.find_edit.text()
+        if not search_text:
+            self._set_status("Enter text to find.")
+            return
+        matches = self._get_all_matches()
+        if not matches:
+            self._set_status(f'"{search_text}" not found.', error=True)
+            return
+        cur_row, cur_col = self._current_position()
+        # Find last match strictly before current position (row-major order)
+        for (row, col) in reversed(matches):
+            if (row, col) < (cur_row, cur_col):
+                self._navigate_to(row, col)
+                self._set_status(f"Match {matches.index((row, col)) + 1} of {len(matches)}")
+                return
+        # Wrap around to last match
+        self._navigate_to(*matches[-1])
+        self._set_status(f"Wrapped. Match {len(matches)} of {len(matches)}")
+
+
+class FindAllDialog(QDialog):
+    """Modeless Find All results window for PTTEdit.
+
+    Displays all cells matching the current Find search term, with the
+    matched text highlighted in yellow.  Clicking a result navigates the
+    table to that cell and grays the selected row.  A Refresh button
+    re-runs the search.
+    """
+
+    MATCH_HIGHLIGHT = '#FFFF00'
+    SELECTED_BG     = '#e5e5e5'
+
+    # Column labels matching Rename preview style
+    COL_LABELS = {
+        column_index(PROCESS_NAME_HDR):       None,
+        column_index(TASK_NAME_HDR):          None,
+        column_index(START_TIME_FORMULA_HDR): 'Start-f',
+        column_index(END_TIME_FORMULA_HDR):   'End-f',
+    }
+
+    def __init__(self, find_dialog):
+        super().__init__(find_dialog)
+        self.find_dialog = find_dialog
+        self.window      = find_dialog.window
+        self.setWindowTitle("Find All Results")
+        self.setWindowFlags(
+            self.windowFlags()
+            | Qt.WindowMaximizeButtonHint
+            | Qt.WindowMinimizeButtonHint
+            | Qt.WindowStaysOnTopHint
+        )
+        self.setMinimumSize(600, 400)
+
+        # Parallel list: one entry per displayed result line → (row, col)
+        self._result_map    = []
+        # Stored unselected <div> strings for efficient selection rendering
+        self._html_lines    = []
+        self._selected_block = -1
+
+        # --- Scrollable HTML text area ---
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.mousePressEvent = self._on_click
+
+        # --- Summary label ---
+        self.summary_label = QLabel("")
+        self.summary_label.setStyleSheet("font-weight: bold;")
+
+        # --- Buttons ---
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self.refresh)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(refresh_btn)
+        btn_layout.addWidget(close_btn)
+
+        # --- Top-level layout ---
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.summary_label)
+        layout.addWidget(self.text_edit)
+        layout.addLayout(btn_layout)
+
+    def _build_label(self, row, col, cell_text):
+        """Return the plain-text label for a result entry."""
+        model = self.window.model
+        proc = model.item(row, column_index(PROCESS_NAME_HDR)).text()
+        task = model.item(row, column_index(TASK_NAME_HDR)).text()
+        pt   = f'{proc}:{task}'
+        col_label = self.COL_LABELS.get(col)
+        if col_label:
+            return f'{pt}.{col_label}: {cell_text}'
+        else:
+            return pt
+
+    def _highlight_html(self, label, search_text, case_sensitive):
+        """Return an HTML string with all occurrences of search_text highlighted."""
+        escaped_label  = html.escape(label)
+        escaped_search = html.escape(search_text)
+        flags = 0 if case_sensitive else re.IGNORECASE
+        pattern = re.compile(re.escape(escaped_search), flags)
+        return pattern.sub(
+            lambda m: (
+                f'<span style="background-color:{self.MATCH_HIGHLIGHT};">'
+                f'{m.group(0)}</span>'
+            ),
+            escaped_label
+        )
+
+    def _render_html(self):
+        """Render full HTML from self._html_lines, applying selection background."""
+        parts = []
+        for i, div in enumerate(self._html_lines):
+            if i == self._selected_block:
+                # Inject selection background into the div's style
+                selected_div = div.replace(
+                    'white-space:pre;"',
+                    f'white-space:pre; background-color:{self.SELECTED_BG};"',
+                    1
+                )
+                parts.append(selected_div)
+            else:
+                parts.append(div)
+        return ''.join(parts)
+
+    def refresh(self):
+        """Re-run the search and repopulate the results window."""
+        search_text    = self.find_dialog.find_edit.text()
+        case_sensitive = self.find_dialog.case_checkbox.isChecked()
+        matches        = self.find_dialog._get_all_matches()
+
+        self._result_map     = []
+        self._html_lines     = []
+        self._selected_block = -1
+
+        if not search_text:
+            self.summary_label.setText("No search term entered.")
+            self.text_edit.setHtml("")
+            return
+
+        if not matches:
+            self.summary_label.setText(f'"{search_text}" \u2014 not found.')
+            self.text_edit.setHtml("")
+            return
+
+        model = self.window.model
+        for row, col in matches:
+            item      = model.item(row, col)
+            cell_text = item.text() if item else ""
+            line_no   = row + 1
+            label     = self._build_label(row, col, cell_text)
+            body      = self._highlight_html(label, search_text, case_sensitive)
+            self._html_lines.append(
+                f'<div style="font-family:\'Courier New\',monospace; white-space:pre;">'
+                f'<b>{line_no}:</b> {body}</div>'
+            )
+            self._result_map.append((row, col))
+
+        noun = "match" if len(matches) == 1 else "matches"
+        self.summary_label.setText(f'{len(matches)} {noun} for "{search_text}"')
+        self.text_edit.setHtml(self._render_html())
+
+    def _on_click(self, event):
+        """Map a mouse click in the text area to a table navigation."""
+        QTextEdit.mousePressEvent(self.text_edit, event)
+        block_number = self.text_edit.textCursor().blockNumber()
+        if 0 <= block_number < len(self._result_map):
+            self._selected_block = block_number
+            self.text_edit.setHtml(self._render_html())
+            row, col = self._result_map[block_number]
+            self.find_dialog._navigate_to(row, col)
+            self.window.raise_()
+
+
+class RenamePreviewDialog(QDialog):
+    """Modal preview dialog showing all changes that Rename All will make.
+
+    Displayed by RenameDialog.preview_all() before committing the rename.
+    Contains a scrollable read-only text area listing every before/after
+    change with matched text highlighted, plus a Rename All button to
+    commit directly from the preview.  Clicking a result line navigates
+    the table to that row.
+    """
+
+    FROM_HIGHLIGHT = '#FFFF00'   # yellow    — text being renamed
+    TO_HIGHLIGHT   = '#ADD8E6'   # light blue — replacement text
+    SELECTED_BG    = '#e5e5e5'
+
+    def __init__(self, parent, changes, from_text, to_text, rename_callback):
+        """
+        parent          -- the RenameDialog instance (modal parent)
+        changes         -- list of (line_no, before_label, after_label) tuples
+                           as produced by DataFrameEditor.collect_rename_changes()
+        from_text       -- literal text being renamed (highlighted yellow)
+        to_text         -- replacement text (highlighted light blue)
+        rename_callback -- callable with no args; executes the actual rename
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Rename Preview")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
+        self.setMinimumSize(600, 400)
+        self._rename_callback = rename_callback
+        self._window = parent.window
+
+        # Parallel map: HTML block number → 0-based row index for navigation.
+        # Each change produces 2 blocks (before + after); both map to same row.
+        self._result_map     = []
+        # Stored unselected <div> strings for efficient selection rendering
+        self._html_lines     = []
+        self._selected_block = -1   # first block of selected pair (-1 = none)
+
+        # --- Build highlighted HTML ---
+        for line_no, before, after in changes:
+            before_html = self._highlight(before, from_text, self.FROM_HIGHLIGHT)
+            after_html  = self._highlight(after,  to_text,   self.TO_HIGHLIGHT)
+            self._html_lines.append(
+                f'<div style="font-family:\'Courier New\',monospace; white-space:pre;">'
+                f'<b>{line_no}:</b> {before_html}</div>'
+            )
+            self._html_lines.append(
+                f'<div style="font-family:\'Courier New\',monospace; white-space:pre;">'
+                f'&nbsp;&nbsp;\u2192 {after_html}</div>'
+            )
+            row_index = line_no - 1
+            self._result_map.append(row_index)
+            self._result_map.append(row_index)
+
+        # --- Scrollable read-only text area ---
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setHtml(self._render_html())
+        self.text_edit.mousePressEvent = self._on_click
+
+        # --- Summary label ---
+        noun = "change" if len(changes) == 1 else "changes"
+        summary = QLabel(f"{len(changes)} {noun} will be made.")
+        summary.setStyleSheet("font-weight: bold;")
+
+        # --- Buttons ---
+        rename_btn = QPushButton("Rename All")
+        rename_btn.setDefault(True)
+        rename_btn.clicked.connect(self._do_rename)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.reject)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(rename_btn)
+        btn_layout.addWidget(close_btn)
+
+        # --- Top-level layout ---
+        layout = QVBoxLayout(self)
+        layout.addWidget(summary)
+        layout.addWidget(self.text_edit)
+        layout.addLayout(btn_layout)
+
+    @staticmethod
+    def _highlight(text, term, color):
+        """Return HTML with all occurrences of term in text highlighted in color.
+        Identifiers are always case-sensitive.
+        """
+        escaped_text = html.escape(text)
+        escaped_term = html.escape(term)
+        pattern = re.compile(re.escape(escaped_term))
+        return pattern.sub(
+            lambda m: f'<span style="background-color:{color};">{m.group(0)}</span>',
+            escaped_text
+        )
+
+    def _render_html(self):
+        """Render full HTML from self._html_lines, applying selection background
+        to the clicked pair of blocks (before + after line).
+        """
+        parts = []
+        for i, div in enumerate(self._html_lines):
+            # _selected_block is the first (before) block of the selected pair.
+            # Both blocks in the pair (i and i+1) get the gray background.
+            if (self._selected_block >= 0 and
+                    (i == self._selected_block or i == self._selected_block + 1)):
+                selected_div = div.replace(
+                    'white-space:pre;"',
+                    f'white-space:pre; background-color:{self.SELECTED_BG};"',
+                    1
+                )
+                parts.append(selected_div)
+            else:
+                parts.append(div)
+        return ''.join(parts)
+
+    def _on_click(self, event):
+        """Map a mouse click in the text area to a table row navigation."""
+        QTextEdit.mousePressEvent(self.text_edit, event)
+        block_number = self.text_edit.textCursor().blockNumber()
+        if 0 <= block_number < len(self._result_map):
+            # Normalise to the first block of the pair (always even-indexed)
+            self._selected_block = block_number - (block_number % 2)
+            self.text_edit.setHtml(self._render_html())
+            row_index = self._result_map[block_number]
+            index = self._window.model.index(row_index, column_index(PROCESS_NAME_HDR))
+            self._window.table_view.setCurrentIndex(index)
+            self._window.table_view.scrollTo(index)
+            self._window.raise_()
+
+    def _do_rename(self):
+        """Execute the rename then close the preview."""
+        self._rename_callback()
+        self.accept()
+
+
+class RenameDialog(QDialog):
+    """Modeless Rename dialog for PTTEdit.
+
+    Renames a Process Name or Process:Task Name atomically across the
+    entire file — Process column cells and formula references — without
+    breaking existing formula dependencies.
+    """
+
+    # Validation patterns
+    _PROCESS_RE = re.compile(r'^[A-Za-z0-9_]+$')
+    _PT_RE      = re.compile(r'^[A-Za-z0-9_]*:[A-Za-z0-9_]+$')
+
+    def __init__(self, window):
+        super().__init__(window, Qt.Tool)
+        self.window = window
+        self.setWindowTitle("Rename")
+        self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
+
+        # --- Scope group (vertical radio buttons) ---
+        scope_group = QGroupBox("Rename:")
+        self.process_radio = QRadioButton("Process Names")
+        self.pt_radio      = QRadioButton("Process:Task Names")
+        self.process_radio.setChecked(True)
+
+        scope_layout = QVBoxLayout()
+        scope_layout.addWidget(self.process_radio)
+        scope_layout.addWidget(self.pt_radio)
+        scope_group.setLayout(scope_layout)
+
+        # --- From field (label above input) ---
+        from_label = QLabel("From:")
+        self.from_edit = QLineEdit()
+        self.from_edit.setMinimumWidth(360)
+
+        # --- To field (label above input) ---
+        to_label = QLabel("To:")
+        self.to_edit = QLineEdit()
+        self.to_edit.setMinimumWidth(360)
+
+        # --- Selected Rows field ---
+        rows_label = QLabel("Selected Rows:")
+        self.rows_edit = QLineEdit()
+        self.rows_edit.setMinimumWidth(360)
+        self.rows_edit.setToolTip(
+            "Rows to rename. Examples:\n"
+            "  1-      row 1 to end (all rows)\n"
+            "  10-     row 10 to end\n"
+            "  3-10    rows 3 through 10\n"
+            "  1,2,5   rows 1, 2, and 5\n"
+            "  1-20,30 rows 1 through 20, and 30"
+        )
+
+        # --- Status label ---
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: gray;")
+
+        # --- Buttons ---
+        preview_btn = QPushButton("Preview All")
+        preview_btn.clicked.connect(self.preview_all)
+
+        self.rename_all_btn = QPushButton("Rename All")
+        self.rename_all_btn.setDefault(True)
+        self.rename_all_btn.clicked.connect(self.rename_all)
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.close)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(preview_btn)
+        btn_layout.addWidget(self.rename_all_btn)
+        btn_layout.addWidget(close_btn)
+
+        # --- Top-level layout ---
+        layout = QVBoxLayout(self)
+        layout.addWidget(scope_group)
+        layout.addWidget(from_label)
+        layout.addWidget(self.from_edit)
+        layout.addWidget(to_label)
+        layout.addWidget(self.to_edit)
+        layout.addWidget(rows_label)
+        layout.addWidget(self.rows_edit)
+        layout.addWidget(self.status_label)
+        layout.addLayout(btn_layout)
+
+        self.from_edit.textChanged.connect(self._clear_status)
+        self.to_edit.textChanged.connect(self._clear_status)
+        self.rows_edit.textChanged.connect(self._clear_status)
+        self.process_radio.toggled.connect(self._clear_status)
+
+    def _clear_status(self):
+        self.status_label.setText("")
+        self.status_label.setStyleSheet("color: gray;")
+
+    def _set_status(self, text, error=False, success=False):
+        self.status_label.setText(text)
+        if error:
+            self.status_label.setStyleSheet("color: red;")
+        elif success:
+            self.status_label.setStyleSheet("color: green;")
+        else:
+            self.status_label.setStyleSheet("color: gray;")
+
+    def _default_rows_text(self):
+        """Return the default Selected Rows string for the current table size."""
+        n = self.window.model.rowCount() if self.window.model else 0
+        return f"1-{n}" if n > 0 else "1-"
+
+    def _get_selected_rows(self):
+        """Parse the Selected Rows field and return a sorted list of 0-based indices.
+        Sets status and returns None on error.
+        """
+        row_count = self.window.model.rowCount() if self.window.model else 0
+        try:
+            return parse_row_selection(self.rows_edit.text(), row_count)
+        except ValueError as e:
+            self._set_status(str(e), error=True)
+            return None
+
+    def _validate(self):
+        """Validate From/To and Selected Rows fields for the current scope mode.
+        Returns (from_text, to_text, mode, selected_rows) on success, or None
+        on failure (sets status label with the error message).
+        """
+        from_text = self.from_edit.text().strip()
+        to_text   = self.to_edit.text().strip()
+
+        if self.process_radio.isChecked():
+            mode = 'process'
+            if not from_text:
+                self._set_status("'From' must not be blank for Process Names.", error=True)
+                return None
+            if not to_text:
+                self._set_status("'To' must not be blank for Process Names.", error=True)
+                return None
+            if not self._PROCESS_RE.match(from_text):
+                self._set_status("'From' must contain only letters, digits, or underscores.", error=True)
+                return None
+            if not self._PROCESS_RE.match(to_text):
+                self._set_status("'To' must contain only letters, digits, or underscores.", error=True)
+                return None
+        else:
+            mode = 'process_task'
+            for field_label, text in (("'From'", from_text), ("'To'", to_text)):
+                if not self._PT_RE.match(text):
+                    self._set_status(
+                        f"{field_label} must be in the form Process:Task or :Task "
+                        f"(letters, digits, underscores only; colon required; Task must not be blank).",
+                        error=True)
+                    return None
+
+        if from_text == to_text:
+            self._set_status("'From' and 'To' are identical — nothing to rename.", error=True)
+            return None
+
+        selected_rows = self._get_selected_rows()
+        if selected_rows is None:
+            return None
+
+        return from_text, to_text, mode, selected_rows
+
+    def preview_all(self):
+        """Collect changes via dry-run and show the preview dialog (modal)."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        result = self._validate()
+        if result is None:
+            return
+        from_text, to_text, mode, selected_rows = result
+
+        changes = self.window.collect_rename_changes(from_text, to_text, mode, selected_rows)
+        if not changes:
+            self._set_status(f'"{from_text}" not found — nothing to rename.', error=True)
+            return
+
+        self._clear_status()
+
+        def do_rename():
+            count = self.window.do_rename_all(from_text, to_text, mode, selected_rows)
+            noun = "occurrence" if count == 1 else "occurrences"
+            self._set_status(f"Renamed {count} {noun}.", success=True)
+
+        dlg = RenamePreviewDialog(self, changes, from_text, to_text, do_rename)
+        dlg.exec()
+
+    def rename_all(self):
+        """Validate inputs then delegate to DataFrameEditor.do_rename_all()."""
+        if self.window.dataframe is None:
+            self._set_status("No file loaded.", error=True)
+            return
+        result = self._validate()
+        if result is None:
+            return
+        from_text, to_text, mode, selected_rows = result
+        count = self.window.do_rename_all(from_text, to_text, mode, selected_rows)
+        if count == 0:
+            self._set_status(f'"{from_text}" not found — nothing renamed.', error=True)
+        else:
+            noun = "occurrence" if count == 1 else "occurrences"
+            self._set_status(f"Renamed {count} {noun}.", success=True)
+
+
 class DataFrameEditor(QMainWindow):
     def __init__(self, filename=None, splash=None, splash_label=None, splash_img=None):
         super().__init__()
@@ -435,6 +1282,10 @@ class DataFrameEditor(QMainWindow):
         # Track file modifications
         self.file_modified = False
 
+        # Modeless dialogs — created once, re-raised on subsequent calls
+        self._find_dialog = None
+        self._rename_dialog = None
+
         # Create status bar
         self.status_bar = self.statusBar()
         self.status_label = None  # Will hold general status messages
@@ -450,6 +1301,62 @@ class DataFrameEditor(QMainWindow):
 
         debugging.leave()
         
+    def _rebuild_recent_menu(self):
+        """Repopulate the Open Recent submenu just before it is shown."""
+        if recent_files is None:
+            return
+        self.file_open_recent_menu.clear()
+        new_menu = recent_files.build_menu(self, self._open_recent_file)
+        for action in new_menu.actions():
+            self.file_open_recent_menu.addAction(action)
+
+    def _open_recent_file(self, file_path: str):
+        """Open a file chosen from the Open Recent submenu."""
+        debugging.enter(f'file_path={file_path}')
+        if not self.check_unsaved_changes():
+            debugging.leave('Cancelled by user')
+            return
+        if not os.path.isfile(file_path):
+            QMessageBox.warning(self, 'File Not Found',
+                f'The file no longer exists:\n{file_path}')
+            debugging.leave('File not found')
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.setWindowTitle(f'Opening {os.path.basename(file_path)}...')
+        self.update_status_bar('Loading file...')
+        QApplication.processEvents()
+        try:
+            self.workingFilename = file_path
+            self.file_export_csv_action.setEnabled(True)
+            self.file_export_ods_action.setEnabled(True)
+            self.file_export_puml_action.setEnabled(True)
+            self.dependency_graph = {}
+            self.recalc_order = []
+            with open(self.workingFilename, 'r') as json_file:
+                config_dataframe_dict = json.load(json_file)
+            raw_metadata = config_dataframe_dict.get('file_metadata', {})
+            self.file_metadata = {'time_unit': str(raw_metadata.get('time_unit', ''))}
+            self._set_time_unit_combo(self.file_metadata['time_unit'])
+            self.dataframe = pd.DataFrame.from_dict(
+                config_dataframe_dict['dataframe'], orient='index')
+            self.dataframe.index = self.dataframe.index.astype(int)
+            self.dataframe = self.dataframe.fillna('')
+            self.apply_rules_and_populate_model()
+            self.setWindowTitle(f'{PROGRAM_NAME} - {file_path}')
+            self.set_file_modified(False)
+            if recent_files is not None:
+                recent_files.add(file_path)
+        except Exception as e:
+            debugging.print(f'ERROR: {e}')
+            QMessageBox.critical(self, f'Error Opening File',
+                f'File: {file_path}\nException: {e}')
+            self.setWindowTitle(f'{PROGRAM_NAME}')
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.set_fixed_column_widths()
+        self.resize(self.suggested_window_width, self.suggested_window_height)
+        debugging.leave()
+
     def set_fixed_column_widths(self):
         debugging.enter()
         header = self.table_view.horizontalHeader()
@@ -510,7 +1417,7 @@ class DataFrameEditor(QMainWindow):
 
     def _set_time_unit_combo(self, unit):
         """Set the time unit combo box without triggering the modified flag.
-        Used during file load/new/demo where the change is not a user edit."""
+        Used during file load/new where the change is not a user edit."""
         self.time_unit_combo.blockSignals(True)
         self.time_unit_combo.setCurrentText(unit)
         self.time_unit_combo.blockSignals(False)
@@ -563,8 +1470,6 @@ class DataFrameEditor(QMainWindow):
         # Get base title
         if self.workingFilename:
             title = f"{PROGRAM_NAME} - {self.workingFilename}"
-        elif "*Demo*" in self.windowTitle():
-            title = f"{PROGRAM_NAME} - *Demo*"
         elif "*New*" in self.windowTitle():
             title = f"{PROGRAM_NAME} - *New*"
         else:
@@ -613,9 +1518,6 @@ class DataFrameEditor(QMainWindow):
         debugging.enter()
         menu_bar = self.menuBar()
         file_menu = menu_bar.addMenu("&File")
-        file_demo_action = QAction("&Demo", self)
-        file_demo_action.triggered.connect(self.demo_timeline_file)
-        file_menu.addAction(file_demo_action)
         file_new_action = QAction("&New", self)
         file_new_action.triggered.connect(self.new_timeline_file)
         file_menu.addAction(file_new_action)
@@ -623,6 +1525,8 @@ class DataFrameEditor(QMainWindow):
         file_open_pttd_action = QAction("&Open", self)
         file_open_pttd_action.triggered.connect(self.open_timeline_from_pttd)
         file_menu.addAction(file_open_pttd_action)
+        self.file_open_recent_menu = file_menu.addMenu("Open &Recent")
+        self.file_open_recent_menu.aboutToShow.connect(self._rebuild_recent_menu)
         file_save_action = QAction("&Save", self)
         file_save_action.setShortcut(QKeySequence.Save)  # Ctrl+S
         file_save_action.triggered.connect(self.save_timeline_file)
@@ -697,6 +1601,19 @@ class DataFrameEditor(QMainWindow):
         # All row actions start disabled until a row is selected
         self._set_edit_row_actions_enabled(False)
 
+        edit_menu.addSeparator()
+
+        edit_find_action = QAction("&Find...", self)
+        edit_find_action.setShortcut("Ctrl+F")
+        edit_find_action.triggered.connect(self.show_find_dialog)
+        edit_menu.addAction(edit_find_action)
+
+        self.edit_rename_action = QAction("&Rename...", self)
+        self.edit_rename_action.setShortcut("Ctrl+R")
+        self.edit_rename_action.triggered.connect(self.show_rename_dialog)
+        self.edit_rename_action.setEnabled(False)  # Enabled once a file is loaded
+        edit_menu.addAction(self.edit_rename_action)
+
         view_menu = menu_bar.addMenu("&View")
         self.view_plot_action = QAction("&Plot", self)
         self.view_plot_action.triggered.connect(self.plot_timeline)
@@ -721,6 +1638,28 @@ class DataFrameEditor(QMainWindow):
         help_sysinfo_action = QAction("&System Information", self)
         help_sysinfo_action.triggered.connect(self.show_system_info)
         help_menu.addAction(help_sysinfo_action)
+
+        help_menu.addSeparator()
+
+        support_menu = help_menu.addMenu("S&upport")
+
+        support_discussions_action = QAction("&Discussions", self)
+        support_discussions_action.triggered.connect(self.open_discussions)
+        support_menu.addAction(support_discussions_action)
+
+        support_issues_action = QAction("&Issues", self)
+        support_issues_action.triggered.connect(self.open_issues)
+        support_menu.addAction(support_issues_action)
+
+        support_menu.addSeparator()
+
+        support_bug_action = QAction("Submit &Bug Report", self)
+        support_bug_action.triggered.connect(self.submit_bug_report)
+        support_menu.addAction(support_bug_action)
+
+        support_feature_action = QAction("Submit &Feature Request", self)
+        support_feature_action.triggered.connect(self.submit_feature_request)
+        support_menu.addAction(support_feature_action)
         
         debugging.leave()
 
@@ -807,8 +1746,9 @@ class DataFrameEditor(QMainWindow):
                 if (not pttd_filename): return
 
             debugging.print(f'File for plotter: {pttd_filename}')
-            # Save current timeline data before starting plotter
-            self.save_timeline_to_pttd(pttd_filename)
+            # Save current timeline data before starting plotter (only if modified)
+            if self.file_modified:
+                self.save_timeline_to_pttd(pttd_filename)
             
             try:
                 if (Path(exe_name).parent == Path('.')):            # If no path specified for exe:
@@ -880,20 +1820,7 @@ class DataFrameEditor(QMainWindow):
     def show_about(self):
         """Display About dialog with version and copyright information"""
         debugging.enter()
-        
-        # Create a custom message box instead of using QMessageBox.about()
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(f"About {PROGRAM_NAME}")
-        
-        # Load and set the icon (adjust path as needed)
-        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
-        if Path(icon_path).is_file():
-            icon = QIcon(icon_path)
-            msg_box.setIconPixmap(icon.pixmap(48, 48))  # pixel display size
-        else:
-            # Fallback to default info icon if file not found
-            msg_box.setIcon(QMessageBox.Information)
-        
+
         about_text = f"""
             <h2>{PROGRAM_NAME}</h2>
             <p><b>Version:</b> {APP_VERSION}</p>
@@ -903,23 +1830,68 @@ class DataFrameEditor(QMainWindow):
             <p><b>Date:</b> {APP_DATE}</p>
             <p>{APP_COPYRIGHT}</p>
             """
-        msg_box.setText(about_text)
-        msg_box.setTextFormat(Qt.RichText)
-        msg_box.exec()
-        
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"About {PROGRAM_NAME}")
+
+        # Icon (window title bar + body)
+        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
+        icon_exists = Path(icon_path).is_file()
+        if icon_exists:
+            icon = QIcon(icon_path)
+            dlg.setWindowIcon(icon)
+
+        # Body icon label (left side)
+        icon_label = QLabel()
+        if icon_exists:
+            icon_label.setPixmap(icon.pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignTop)
+
+        # Content
+        content = QLabel()
+        content.setTextFormat(Qt.RichText)
+        content.setText(about_text)
+        content.setWordWrap(True)
+        content.setOpenExternalLinks(True)
+
+        # Icon + content row
+        body_layout = QHBoxLayout()
+        body_layout.addWidget(icon_label)
+        body_layout.addWidget(content)
+
+        # Buttons
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        close_btn.setDefault(True)
+
+        def copy_to_clipboard():
+            QApplication.clipboard().setText(html_to_plain_text(about_text))
+            copy_btn.setText("Copied")
+            QTimer.singleShot(1500, lambda: copy_btn.setText("Copy to Clipboard"))
+
+        copy_btn.clicked.connect(copy_to_clipboard)
+        close_btn.clicked.connect(dlg.accept)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout = QVBoxLayout(dlg)
+        layout.addLayout(body_layout)
+        layout.addLayout(btn_layout)
+
+        dlg.exec()
         debugging.leave()
 
-    def show_system_info(self):
-        """Display System Information dialog with Python and module versions"""
-        debugging.enter()
-        
+    def _build_sysinfo_html(self) -> str:
+        """Build and return the System Information HTML string."""
         # Get Python version
-        # python_version = sys.version.split()[0]
         python_version, python_details = sys.version.split(' ',1)
         python_build, python_compile = python_details.split(') [',1)
         python_build = python_build + ')'
         python_compile = '[' + python_compile
-        
+
         # Get module versions
         module_list = ['PySide6','pandas','numpy','configparser','platformdirs','json5','configupdater','odfpy']
         module_versions = []
@@ -929,33 +1901,13 @@ class DataFrameEditor(QMainWindow):
                 module_versions.append(f"<tr><td>&nbsp;&nbsp;{module_name}</td><td>&nbsp;{ver}</td></tr>")
             except Exception:
                 module_versions.append(f"<tr><td>&nbsp;&nbsp;{module_name}</td><td>&nbsp;<i>(version not found)</i></td></tr>")
-        
-        # Get OS information with Windows 11 detection
+
+        os_info     = get_os_info()
         platform_str = platform.platform()
-        os_name = platform.system()
-        os_release = platform.release()
-        
-        # Check if Windows 11 based on build number
-        if os_name == "Windows" and os_release == "10":
-            # Extract build number from platform string
-            # Format: Windows-10-10.0.BUILDNUMBER-SP0
-            build_match = re.search(r'10\.0\.(\d+)', platform_str)
-            if build_match:
-                build_num = int(build_match.group(1))
-                if build_num >= 22000:  # Windows 11 starts at build 22000
-                    os_info = f"Windows 11 (Build {build_num})"
-                else:
-                    os_info = f"Windows 10 (Build {build_num})"
-            else:
-                os_info = f"{os_name} {os_release}"
-        else:
-            os_info = f"{os_name} {os_release}"
-        
-        # Get file paths
-        current_dir = os.getcwd()
-        script_path = os.path.dirname(os.path.abspath(__file__))
-        
-        sysinfo_text = f"""
+        current_dir  = os.getcwd()
+        script_path  = os.path.dirname(os.path.abspath(__file__))
+
+        return f"""
             <h3>System Information</h3>
             <p><b>Application:</b> {PROGRAM_NAME} v{APP_VERSION}</p>
 
@@ -963,8 +1915,7 @@ class DataFrameEditor(QMainWindow):
             <p><b>Platform:</b> {platform_str}</p>
 
             <p><b>Python Version:</b> {python_version}<br>&nbsp;&nbsp;{python_build}<br>&nbsp;&nbsp;{python_compile}</p>
-            <p><b>Third-Party Packages:</b></p
-            >
+            <p><b>Third-Party Packages:</b></p>
             <table border="0" cellpadding="0">
             {''.join(module_versions)}
             </table>
@@ -978,64 +1929,99 @@ class DataFrameEditor(QMainWindow):
             <tr><td><b>Debug<br>Logging:</b></td><td><b>Enabled:</b> {debugging_enabled}<br><b>File:</b> {os.path.basename(debugging_filename)}</td></tr>
             </table>
             """
-        QMessageBox.about(self, "System Information", sysinfo_text)
+
+    def show_system_info(self):
+        """Display System Information dialog with Python and module versions"""
+        debugging.enter()
+
+        sysinfo_text = self._build_sysinfo_html()
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("System Information")
+
+        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
+        icon_exists = Path(icon_path).is_file()
+        if icon_exists:
+            icon = QIcon(icon_path)
+            dlg.setWindowIcon(icon)
+
+        icon_label = QLabel()
+        if icon_exists:
+            icon_label.setPixmap(icon.pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignTop)
+
+        content = QLabel()
+        content.setTextFormat(Qt.RichText)
+        content.setText(sysinfo_text)
+        content.setWordWrap(True)
+
+        body_layout = QHBoxLayout()
+        body_layout.addWidget(icon_label)
+        body_layout.addWidget(content)
+
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        close_btn.setDefault(True)
+
+        def copy_to_clipboard():
+            QApplication.clipboard().setText(html_to_plain_text(sysinfo_text))
+            copy_btn.setText("Copied")
+            QTimer.singleShot(1500, lambda: copy_btn.setText("Copy to Clipboard"))
+
+        copy_btn.clicked.connect(copy_to_clipboard)
+        close_btn.clicked.connect(dlg.accept)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout = QVBoxLayout(dlg)
+        layout.addLayout(body_layout)
+        layout.addLayout(btn_layout)
+
+        dlg.exec()
         debugging.leave()
 
-    def demo_timeline_file(self):
+    def open_discussions(self):
+        """Open the PTTimeline GitHub Discussions page in the default browser."""
+        webbrowser.open_new_tab(f"{APP_REPO_URL}/discussions")
+
+    def open_issues(self):
+        """Open the PTTimeline GitHub Issues page in the default browser."""
+        webbrowser.open_new_tab(f"{APP_REPO_URL}/issues")
+
+    def submit_bug_report(self):
+        """Open a pre-filled GitHub bug report issue form in the default browser."""
         debugging.enter()
-        if not self.check_unsaved_changes():
-            debugging.leave('Cancelled by user')
-            return
-        
-        self.update_status_bar("Loading demo...")
-        QApplication.processEvents()  # Force UI update
-        self.workingFilename = None
-        self.file_metadata = {'time_unit': ''}
-        self._set_time_unit_combo('')
-        self.file_export_csv_action.setEnabled(False)
-        self.file_export_ods_action.setEnabled(False)
-        self.file_export_puml_action.setEnabled(False)
-        self.setWindowTitle(f"{PROGRAM_NAME} - *Demo*")
-        self.dependency_graph = {}
-        self.recalc_order = []
-        self.dataframe = pd.DataFrame([
-            {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task1', 
-                START_TIME_FORMULA_HDR:'0.0',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'1.0',
-                END_TIME_HDR:None, DURATION_HDR:None},
-            {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task2',
-                START_TIME_FORMULA_HDR:'End(Process1:Task1)',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'Start(Process1:Task2)+Duration(Process1:Task1)',
-                END_TIME_HDR:None,
-                DURATION_HDR:None},
-            {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task3',
-                START_TIME_FORMULA_HDR:'End(Process1:Task2)',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'Start(Process1:Task3)+Duration(Process1:Task1)',
-                END_TIME_HDR:None,
-                DURATION_HDR:None},
-            {PROCESS_NAME_HDR:'Process1', TASK_NAME_HDR:'Task4',
-                START_TIME_FORMULA_HDR:'End(Process1:Task3)',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'Start(Process1:Task4)+Duration(Process1:Task1)',
-                END_TIME_HDR:None,
-                DURATION_HDR:None},
-            {PROCESS_NAME_HDR:'Process2', TASK_NAME_HDR:'Task1',
-                START_TIME_FORMULA_HDR:'Start(Process1:Task2)',
-                START_TIME_HDR:None,
-                END_TIME_FORMULA_HDR:'Start(Process2:Task1)+2',
-                END_TIME_HDR:None, DURATION_HDR:None},
-            ])
-        debugging.print(f"\nself.dataframe before set_index(ProcessName,TaskName):")
-        debugging.print(f"{self.dataframe}")
-        # self.dataframe.set_index(['ProcessName', 'TaskName'], drop=False, inplace=True)     # Set the MultiIndex
-        debugging.print(f"\nself.dataframe after set_index(ProcessName,TaskName):")
-        debugging.print(f"{self.dataframe}")
-        self.apply_rules_and_populate_model()
-        self.set_fixed_column_widths()
-        self.set_file_modified(False)  # Demo is not considered modified
+        try:
+            context = {
+                "Which Application(s)?": PROGRAM_NAME,
+                "Version":               f"v{APP_VERSION}",
+                "Operating System":      get_os_info(),
+                "System Information":    html_to_plain_text(self._build_sysinfo_html()),
+            }
+            url = build_issue_url(APP_REPO_URL, "bug_report.md", context)
+            webbrowser.open_new_tab(url)
+        except Exception as e:
+            QMessageBox.warning(self, "Network Error",
+                f"Could not reach GitHub to open the bug report form.\n\nPlease check your internet connection and try again.\n\nDetails: {e}")
+        debugging.leave()
+
+    def submit_feature_request(self):
+        """Open a pre-filled GitHub feature request issue form in the default browser."""
+        debugging.enter()
+        try:
+            context = {
+                "Which application(s)?": PROGRAM_NAME,
+                "Version":               f"v{APP_VERSION}",
+                "Operating System":      get_os_info(),
+            }
+            url = build_issue_url(APP_REPO_URL, "feature_request.md", context)
+            webbrowser.open_new_tab(url)
+        except Exception as e:
+            QMessageBox.warning(self, "Network Error",
+                f"Could not reach GitHub to open the feature request form.\n\nPlease check your internet connection and try again.\n\nDetails: {e}")
         debugging.leave()
 
     def new_timeline_file(self):
@@ -1243,7 +2229,7 @@ class DataFrameEditor(QMainWindow):
         self.setWindowTitle(f"Open File...")
         QApplication.processEvents()  # Update UI immediately
         
-        filename, _ = QFileDialog.getOpenFileName(self, f"Open {DATA_FILE_EXTENSION.upper()} File", "", f"{DATA_FILE_EXTENSION.upper()} Files (*.{DATA_FILE_EXTENSION})")
+        filename, _ = QFileDialog.getOpenFileName(self, f"Open {DATA_FILE_EXTENSION.upper()} File", recent_files.get_dialog_dir() if recent_files else "", f"{DATA_FILE_EXTENSION.upper()} Files (*.{DATA_FILE_EXTENSION})")
         
         if filename:
             # Show busy cursor and status
@@ -1289,6 +2275,8 @@ class DataFrameEditor(QMainWindow):
                 # Update window title with filename
                 self.setWindowTitle(f"{PROGRAM_NAME} - {filename}")
                 self.set_file_modified(False)  # File just loaded, not modified
+                if recent_files is not None:
+                    recent_files.add(filename)
                 
             except Exception as e:
                 debugging.print(f'ERROR: {DATA_FILE_EXTENSION.upper()} File: {filename}, e={e}')
@@ -1338,6 +2326,8 @@ class DataFrameEditor(QMainWindow):
             # Update window title with filename
             self.setWindowTitle(f"{PROGRAM_NAME} - {filename}")
             self.set_file_modified(False)  # File just loaded, not modified
+            if recent_files is not None:
+                recent_files.add(filename)
             
         except Exception as e:
             debugging.print(f'ERROR: {DATA_FILE_EXTENSION.upper()} File: {filename}, e={e}')
@@ -1388,6 +2378,189 @@ class DataFrameEditor(QMainWindow):
         self.processNameDelegate.setCompleterStrings(processname_list)
         debugging.leave()
 
+    # -------------------------------------------------------------------------
+    # Find / Rename dialogs
+    # -------------------------------------------------------------------------
+
+    def show_find_dialog(self):
+        """Open (or raise) the modeless Find dialog."""
+        if self._find_dialog is None:
+            self._find_dialog = FindDialog(self)
+        # Always refresh default row selection to reflect current table size
+        self._find_dialog.rows_edit.setText(self._find_dialog._default_rows_text())
+        self._find_dialog.show()
+        self._find_dialog.raise_()
+        self._find_dialog.activateWindow()
+        self._find_dialog.find_edit.setFocus()
+
+    def show_rename_dialog(self):
+        """Open (or raise) the modeless Rename dialog."""
+        if self._rename_dialog is None:
+            self._rename_dialog = RenameDialog(self)
+        # Always refresh default row selection to reflect current table size
+        self._rename_dialog.rows_edit.setText(self._rename_dialog._default_rows_text())
+        self._rename_dialog.show()
+        self._rename_dialog.raise_()
+        self._rename_dialog.activateWindow()
+        self._rename_dialog.from_edit.setFocus()
+
+    def _build_rename_pattern(self, from_text, mode):
+        """Return (formula_pattern, from_proc, from_task) for the given mode.
+
+        formula_pattern -- compiled re for matching in Start-ƒ / End-ƒ cells
+        from_proc       -- process portion of from_text ('' for :Task style)
+        from_task       -- task portion of from_text (None for process mode)
+        """
+        if mode == 'process':
+            pattern = re.compile(r'\b' + re.escape(from_text) + r'(?=:)')
+            return pattern, None, None
+        else:
+            colon_pos = from_text.index(':')
+            from_proc = from_text[:colon_pos]
+            from_task = from_text[colon_pos + 1:]
+            if from_proc:
+                pattern = re.compile(
+                    r'\b' + re.escape(from_proc) + r':' + re.escape(from_task) + r'\b'
+                )
+            else:
+                pattern = re.compile(
+                    r'(?<![A-Za-z0-9_]):' + re.escape(from_task) + r'\b'
+                )
+            return pattern, from_proc, from_task
+
+    def collect_rename_changes(self, from_text, to_text, mode, selected_rows):
+        """Dry-run: return a list of (line_no, before_label, after_label) tuples
+        describing every cell that would be changed by do_rename_all().
+
+        line_no      -- 1-based row number as shown in the table
+        selected_rows -- sorted list of 0-based row indices to search
+        before_label -- e.g. 'X_Axis:X_Move'  or
+                              'X_Axis:X_Move.Start-f: Start(X_Axis:X_Move)+0.1'
+        after_label  -- same structure with substitution applied
+        """
+        debugging.enter(f'from_text={from_text!r}, to_text={to_text!r}, mode={mode}')
+        changes = []
+        formula_pattern, from_proc, from_task = self._build_rename_pattern(from_text, mode)
+
+        if mode == 'process':
+            for row_index in selected_rows:
+                line_no = row_index + 1
+                proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
+                task_val = str(self.dataframe.iloc[row_index][TASK_NAME_HDR])
+                pt_before = f'{proc_val}:{task_val}'
+
+                # Process column change
+                if proc_val == from_text:
+                    pt_after = f'{to_text}:{task_val}'
+                    changes.append((line_no, pt_before, pt_after))
+
+                # Formula column changes
+                for formula_col, col_label in (
+                    (START_TIME_FORMULA_HDR, 'Start-f'),
+                    (END_TIME_FORMULA_HDR,   'End-f'),
+                ):
+                    formula_val = str(self.dataframe.iloc[row_index][formula_col])
+                    new_formula, n = formula_pattern.subn(to_text, formula_val)
+                    if n > 0:
+                        before_label = f'{pt_before}.{col_label}: {formula_val}'
+                        after_label  = f'{pt_before}.{col_label}: {new_formula}'
+                        changes.append((line_no, before_label, after_label))
+
+        else:  # mode == 'process_task'
+            colon_pos_to = to_text.index(':')
+            to_proc = to_text[:colon_pos_to]
+            to_task = to_text[colon_pos_to + 1:]
+            repl = to_text if from_proc else f':{to_task}'
+
+            for row_index in selected_rows:
+                line_no = row_index + 1
+                proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
+                task_val = str(self.dataframe.iloc[row_index][TASK_NAME_HDR])
+                pt_before = f'{proc_val}:{task_val}'
+
+                # Definition row: Process and/or Task cell changes
+                if proc_val == from_proc and task_val == from_task:
+                    new_proc = to_proc if from_proc != to_proc else proc_val
+                    new_task = to_task if from_task != to_task else task_val
+                    pt_after = f'{new_proc}:{new_task}'
+                    if pt_before != pt_after:
+                        changes.append((line_no, pt_before, pt_after))
+
+                # Formula column changes
+                for formula_col, col_label in (
+                    (START_TIME_FORMULA_HDR, 'Start-f'),
+                    (END_TIME_FORMULA_HDR,   'End-f'),
+                ):
+                    formula_val = str(self.dataframe.iloc[row_index][formula_col])
+                    new_formula, n = formula_pattern.subn(repl, formula_val)
+                    if n > 0:
+                        before_label = f'{pt_before}.{col_label}: {formula_val}'
+                        after_label  = f'{pt_before}.{col_label}: {new_formula}'
+                        changes.append((line_no, before_label, after_label))
+
+        debugging.leave(f'len(changes)={len(changes)}')
+        return changes
+
+    def do_rename_all(self, from_text, to_text, mode, selected_rows):
+        """Atomically rename a Process Name or Process:Task Name across the file.
+
+        Operates directly on self.dataframe for rows in selected_rows, then
+        calls apply_rules_and_populate_model() for a single clean rebuild.
+        Returns the total number of cell-level changes made.
+        """
+        debugging.enter(f'from_text={from_text!r}, to_text={to_text!r}, mode={mode}')
+
+        count = 0
+        formula_pattern, from_proc, from_task = self._build_rename_pattern(from_text, mode)
+
+        if mode == 'process':
+            for row_index in selected_rows:
+                proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
+                if proc_val == from_text:
+                    self.dataframe.iloc[row_index, column_index(PROCESS_NAME_HDR)] = to_text
+                    count += 1
+                for formula_col in (START_TIME_FORMULA_HDR, END_TIME_FORMULA_HDR):
+                    formula_val = str(self.dataframe.iloc[row_index][formula_col])
+                    new_formula, n = formula_pattern.subn(to_text, formula_val)
+                    if n > 0:
+                        self.dataframe.iloc[row_index, column_index(formula_col)] = new_formula
+                        count += n
+
+        else:  # mode == 'process_task'
+            colon_pos_to = to_text.index(':')
+            to_proc = to_text[:colon_pos_to]
+            to_task = to_text[colon_pos_to + 1:]
+            repl = to_text if from_proc else f':{to_task}'
+
+            for row_index in selected_rows:
+                proc_val = str(self.dataframe.iloc[row_index][PROCESS_NAME_HDR])
+                task_val = str(self.dataframe.iloc[row_index][TASK_NAME_HDR])
+
+                if proc_val == from_proc and task_val == from_task:
+                    if from_task != to_task:
+                        self.dataframe.iloc[row_index, column_index(TASK_NAME_HDR)] = to_task
+                        count += 1
+                    if from_proc != to_proc:
+                        self.dataframe.iloc[row_index, column_index(PROCESS_NAME_HDR)] = to_proc
+                        count += 1
+
+                for formula_col in (START_TIME_FORMULA_HDR, END_TIME_FORMULA_HDR):
+                    formula_val = str(self.dataframe.iloc[row_index][formula_col])
+                    new_formula, n = formula_pattern.subn(repl, formula_val)
+                    if n > 0:
+                        self.dataframe.iloc[row_index, column_index(formula_col)] = new_formula
+                        count += n
+
+        if count > 0:
+            self.apply_rules_and_populate_model()
+            self.set_fixed_column_widths()
+            self.resize(self.suggested_window_width, self.suggested_window_height)
+            self.set_file_modified(True)
+            self.update_status_bar("Ready")
+
+        debugging.leave(f'count={count}')
+        return count
+
     def calculate_formula(self, formula):
         debugging.enter()
         value = "ERR:"
@@ -1429,6 +2602,9 @@ class DataFrameEditor(QMainWindow):
         QApplication.restoreOverrideCursor()
         
         self.update_processname_completer()
+        # Enable Rename once a file/data is loaded
+        if hasattr(self, 'edit_rename_action'):
+            self.edit_rename_action.setEnabled(True)
         debugging.leave()
 
     def build_dependency_graph(self):
@@ -1857,6 +3033,16 @@ class DataFrameEditor(QMainWindow):
     def save_timeline_to_pttd(self, filename):
         global config
         debugging.enter(f"filename={filename}")
+
+        if config['BACKUPS']['backups_on_bool'] and os.path.isfile(filename):
+            try:
+                backup_file_on_save(filename, config['BACKUPS']['backups_folder'], config['BACKUPS']['backups_max_int'])
+            except Exception as e:
+                QMessageBox.critical(self, 'Backup Error',
+                    f'Failed to create backup of:\n{filename}\n\nError: {e}\n\nThe file was not saved.')
+                debugging.leave()
+                return
+
         data = [[self.model.item(row, col).text() for col in range(self.model.columnCount())] for row in range(self.model.rowCount())]
         # df = pd.DataFrame(data, columns=[self.model.horizontalHeaderItem(i).text() for i in range(self.model.columnCount())])
         df = pd.DataFrame(data, columns=[COLUMN_NAMES[i] for i in range(self.model.columnCount())])
@@ -1878,8 +3064,15 @@ class DataFrameEditor(QMainWindow):
         # Commit any active cell editor before saving so the current edit is included
         self.table_view.setFocus()
 
+        # Skip save if nothing has changed
+        if not self.file_modified:
+            self.update_status_bar("No changes found. Save skipped.")
+            QTimer.singleShot(3000, lambda: self.update_status_bar("Ready"))
+            debugging.leave('No changes, save skipped')
+            return
+
         # If we have a working filename, save directly without prompting
-        if self.workingFilename and not self.windowTitle().endswith("*Demo*") and not self.windowTitle().endswith("*New*"):
+        if self.workingFilename and not self.windowTitle().endswith("*New*"):
             # Show busy cursor and status
             QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             self.setWindowTitle(f"Saving {os.path.basename(self.workingFilename)}...")
@@ -1902,7 +3095,7 @@ class DataFrameEditor(QMainWindow):
                 # Always restore cursor
                 QApplication.restoreOverrideCursor()
         else:
-            # No filename yet, or Demo/New file - use Save As dialog
+            # No filename yet, or New file - use Save As dialog
             self.save_as_timeline_file()
                 
         debugging.leave()
@@ -1941,6 +3134,8 @@ class DataFrameEditor(QMainWindow):
                 # set_file_modified(False) is called inside save_timeline_to_pttd,
                 # which also sets the window title correctly — no manual fixup needed here
                 self.update_status_bar("Ready")
+                if recent_files is not None:
+                    recent_files.add(filename)
                 
             except Exception as e:
                 debugging.print(f'ERROR: Saving File: {filename}, e={e}')
@@ -2680,6 +3875,13 @@ if __name__ == "__main__":
 
     # Load User Config/INI file. Handles setup of default and merging if user config is missing entries.
     config = load_edit_config(f'{PROGRAM_FILENAME}.ini', DEFAULT_CONFIG, PROGRAM_NAME)
+
+    # Initialize recent files manager (INI path is now guaranteed to exist)
+    recent_files = RecentFiles(
+        get_user_ini_path(f'{PROGRAM_FILENAME}.ini'),
+        section='RECENT_FILES',
+        max_entries=RECENT_FILES_MAX,
+    )
 
     debugging_enabled = config['DEBUGGING']['enabled_bool']
     debugging_filename = config['DEBUGGING']['filename']

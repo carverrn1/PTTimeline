@@ -56,3 +56,7 @@ echo ============================================================
 echo.
 
 endlocal
+
+:: Open the installer folder
+explorer "installer"
+exit /b 0

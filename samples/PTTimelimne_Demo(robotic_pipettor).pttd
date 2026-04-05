@@ -1,10 +1,13 @@
 {
+    file_metadata: {
+        time_unit: "",
+    },
     config: {
         META: {
             app_package: "PTTimeline",
             app_name: "PTTEdit",
-            app_version: "0.3.0-dev.26031302",
-            ini_version: "1",
+            app_version: "0.5.0-dev.9",
+            ini_version: "2",
         },
         DEBUGGING: {
             enabled_bool: false,
@@ -14,6 +17,11 @@
             python_exe: "python",
             plotter_py: "pttplot.py",
             plotter_exe: "pttplot.exe",
+        },
+        BACKUPS: {
+            backups_on_bool: true,
+            backups_folder: "ptt_backups",
+            backups_max_int: 100,
         },
     },
     dataframe: {
@@ -81,33 +89,60 @@
             Duration: "0.000",
         },
         "7": {
-            ProcessName: "LOCKSTEPS",
+            ProcessName: "",
             TaskName: "_LS1",
             StartTimeFormula: "0",
             StartTime: "0.000",
-            EndTimeFormula: "24",
+            EndTimeFormula: "Start($:$)+Duration(:_LOCKSTEP_)",
             EndTime: "24.000",
             Duration: "24.000",
         },
         "8": {
-            ProcessName: "LOCKSTEPS",
+            ProcessName: "",
             TaskName: "_LS2",
-            StartTimeFormula: "24",
+            StartTimeFormula: "End($:_LS1)",
             StartTime: "24.000",
-            EndTimeFormula: "48",
+            EndTimeFormula: "Start($:$)+Duration(:_LOCKSTEP_)",
             EndTime: "48.000",
             Duration: "24.000",
         },
         "9": {
+            ProcessName: "",
+            TaskName: "_LS3",
+            StartTimeFormula: "End($:_LS2)",
+            StartTime: "48.000",
+            EndTimeFormula: "Start($:$)+Duration(:_LOCKSTEP_)",
+            EndTime: "72.000",
+            Duration: "24.000",
+        },
+        "10": {
+            ProcessName: "",
+            TaskName: "_LS4",
+            StartTimeFormula: "End($:_LS3)",
+            StartTime: "72.000",
+            EndTimeFormula: "Start($:$)+Duration(:_LOCKSTEP_)",
+            EndTime: "96.000",
+            Duration: "24.000",
+        },
+        "11": {
+            ProcessName: "",
+            TaskName: "_LS5",
+            StartTimeFormula: "End($:_LS4)",
+            StartTime: "96.000",
+            EndTimeFormula: "Start($:$)+Duration(:_LOCKSTEP_)",
+            EndTime: "120.000",
+            Duration: "24.000",
+        },
+        "12": {
             ProcessName: "X_Axis",
             TaskName: "X_Move_To_Aspirate",
-            StartTimeFormula: "Start(LOCKSTEPS:_LS1)",
+            StartTimeFormula: "Start(:_LS1)",
             StartTime: "0.000",
             EndTimeFormula: "Start($:$)+Duration(:_XY_MOVE_TIME_)",
             EndTime: "2.000",
             Duration: "2.000",
         },
-        "10": {
+        "13": {
             ProcessName: "Y_Axis",
             TaskName: "Y_Move_To_Aspirate",
             StartTimeFormula: "Start(X_Axis:X_Move_To_Aspirate)+0.1",
@@ -116,7 +151,7 @@
             EndTime: "2.100",
             Duration: "2.000",
         },
-        "11": {
+        "14": {
             ProcessName: "XY_Gantry",
             TaskName: "XY_Move_To_Aspirate",
             StartTimeFormula: "Min(Start(X_Axis:X_Move_To_Aspirate),Start(Y_Axis:Y_Move_To_Aspirate))",
@@ -125,7 +160,7 @@
             EndTime: "2.100",
             Duration: "2.100",
         },
-        "12": {
+        "15": {
             ProcessName: "X_Axis",
             TaskName: "X_Move_To_Dispense",
             StartTimeFormula: "Max(End(Z1_Pipettor:Raise_To_Home), End(Z2_Pipettor:Raise_To_Home))",
@@ -134,7 +169,7 @@
             EndTime: "13.100",
             Duration: "2.000",
         },
-        "13": {
+        "16": {
             ProcessName: "Y_Axis",
             TaskName: "Y_Move_To_Dispense",
             StartTimeFormula: "Start(X_Axis:X_Move_To_Dispense)+0.1",
@@ -143,7 +178,7 @@
             EndTime: "13.200",
             Duration: "2.000",
         },
-        "14": {
+        "17": {
             ProcessName: "XY_Gantry",
             TaskName: "XY_Move_To_Dispense",
             StartTimeFormula: "Min(Start(X_Axis:X_Move_To_Dispense),Start(Y_Axis:Y_Move_To_Dispense))",
@@ -152,7 +187,7 @@
             EndTime: "13.200",
             Duration: "2.100",
         },
-        "15": {
+        "18": {
             ProcessName: "X_Axis",
             TaskName: "X_Move_To_Home",
             StartTimeFormula: "Max(End(Z1_Pipettor:Raise_After_Dispense), End(Z2_Pipettor:Raise_After_Dispense))",
@@ -161,7 +196,7 @@
             EndTime: "20.200",
             Duration: "2.000",
         },
-        "16": {
+        "19": {
             ProcessName: "Y_Axis",
             TaskName: "Y_Move_To_Home",
             StartTimeFormula: "Start(X_Axis:X_Move_To_Home)+0.1",
@@ -170,7 +205,7 @@
             EndTime: "20.300",
             Duration: "2.000",
         },
-        "17": {
+        "20": {
             ProcessName: "XY_Gantry",
             TaskName: "XY_Move_To_Home",
             StartTimeFormula: "Min(Start(X_Axis:X_Move_To_Home),Start(Y_Axis:Y_Move_To_Home))",
@@ -179,7 +214,7 @@
             EndTime: "20.300",
             Duration: "2.100",
         },
-        "18": {
+        "21": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Lower_To_Detect",
             StartTimeFormula: "End(XY_Gantry:XY_Move_To_Aspirate)",
@@ -188,7 +223,7 @@
             EndTime: "3.600",
             Duration: "1.500",
         },
-        "19": {
+        "22": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Aspirate_Descent",
             StartTimeFormula: "End($:Lower_To_Detect)",
@@ -197,7 +232,7 @@
             EndTime: "9.600",
             Duration: "6.000",
         },
-        "20": {
+        "23": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Raise_To_Home",
             StartTimeFormula: "Max(End($:Aspirate_Descent),End(Syringe_Z1:Aspirate))",
@@ -206,7 +241,7 @@
             EndTime: "11.100",
             Duration: "1.500",
         },
-        "21": {
+        "24": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Lower_To_Dispense",
             StartTimeFormula: "End(XY_Gantry:XY_Move_To_Dispense)",
@@ -215,7 +250,7 @@
             EndTime: "14.200",
             Duration: "1.000",
         },
-        "22": {
+        "25": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Raise_After_Dispense",
             StartTimeFormula: "End(Syringe_Z1:Dispense)",
@@ -224,7 +259,7 @@
             EndTime: "18.200",
             Duration: "1.500",
         },
-        "23": {
+        "26": {
             ProcessName: "Syringe_Z1",
             TaskName: "Aspirate",
             StartTimeFormula: "End(Z1_Pipettor:Lower_To_Detect)",
@@ -233,7 +268,7 @@
             EndTime: "9.600",
             Duration: "6.000",
         },
-        "24": {
+        "27": {
             ProcessName: "Syringe_Z1",
             TaskName: "Dispense",
             StartTimeFormula: "End(Z1_Pipettor:Lower_To_Dispense)",
@@ -242,7 +277,7 @@
             EndTime: "16.700",
             Duration: "2.500",
         },
-        "25": {
+        "28": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Lower_To_Detect",
             StartTimeFormula: "End(XY_Gantry:XY_Move_To_Aspirate)",
@@ -251,7 +286,7 @@
             EndTime: "3.600",
             Duration: "1.500",
         },
-        "26": {
+        "29": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Aspirate_Descent",
             StartTimeFormula: "End($:Lower_To_Detect)",
@@ -260,7 +295,7 @@
             EndTime: "9.600",
             Duration: "6.000",
         },
-        "27": {
+        "30": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Raise_To_Home",
             StartTimeFormula: "Max(End($:Aspirate_Descent),End(Syringe_Z2:Aspirate))",
@@ -269,7 +304,7 @@
             EndTime: "11.100",
             Duration: "1.500",
         },
-        "28": {
+        "31": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Lower_To_Dispense",
             StartTimeFormula: "End(XY_Gantry:XY_Move_To_Dispense)",
@@ -278,7 +313,7 @@
             EndTime: "14.200",
             Duration: "1.000",
         },
-        "29": {
+        "32": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Raise_After_Dispense",
             StartTimeFormula: "End(Syringe_Z2:Dispense)",
@@ -287,7 +322,7 @@
             EndTime: "18.200",
             Duration: "1.500",
         },
-        "30": {
+        "33": {
             ProcessName: "Syringe_Z2",
             TaskName: "Aspirate",
             StartTimeFormula: "End(Z2_Pipettor:Lower_To_Detect)",
@@ -296,7 +331,7 @@
             EndTime: "9.600",
             Duration: "6.000",
         },
-        "31": {
+        "34": {
             ProcessName: "Syringe_Z2",
             TaskName: "Dispense",
             StartTimeFormula: "End(Z2_Pipettor:Lower_To_Dispense)",
@@ -305,16 +340,16 @@
             EndTime: "16.700",
             Duration: "2.500",
         },
-        "32": {
+        "35": {
             ProcessName: "X_Axis",
             TaskName: "X_Move_To_Aspirate_LS2",
-            StartTimeFormula: "Start(LOCKSTEPS:_LS2)",
+            StartTimeFormula: "Start(:_LS2)",
             StartTime: "24.000",
             EndTimeFormula: "Start($:$)+Duration(:_XY_MOVE_TIME_)",
             EndTime: "26.000",
             Duration: "2.000",
         },
-        "33": {
+        "36": {
             ProcessName: "Y_Axis",
             TaskName: "Y_Move_To_Aspirate_LS2",
             StartTimeFormula: "Start(X_Axis:X_Move_To_Aspirate_LS2)+0.1",
@@ -323,7 +358,7 @@
             EndTime: "26.100",
             Duration: "2.000",
         },
-        "34": {
+        "37": {
             ProcessName: "XY_Gantry",
             TaskName: "XY_Move_To_Aspirate_LS2",
             StartTimeFormula: "Min(Start(X_Axis:X_Move_To_Aspirate_LS2),Start(Y_Axis:Y_Move_To_Aspirate_LS2))",
@@ -332,7 +367,7 @@
             EndTime: "26.100",
             Duration: "2.100",
         },
-        "35": {
+        "38": {
             ProcessName: "X_Axis",
             TaskName: "X_Move_To_Dispense_LS2",
             StartTimeFormula: "Max(End(Z1_Pipettor:Raise_To_Home_LS2), End(Z2_Pipettor:Raise_To_Home_LS2))",
@@ -341,7 +376,7 @@
             EndTime: "37.100",
             Duration: "2.000",
         },
-        "36": {
+        "39": {
             ProcessName: "Y_Axis",
             TaskName: "Y_Move_To_Dispense_LS2",
             StartTimeFormula: "Start(X_Axis:X_Move_To_Dispense_LS2)+0.1",
@@ -350,7 +385,7 @@
             EndTime: "37.200",
             Duration: "2.000",
         },
-        "37": {
+        "40": {
             ProcessName: "XY_Gantry",
             TaskName: "XY_Move_To_Dispense_LS2",
             StartTimeFormula: "Min(Start(X_Axis:X_Move_To_Dispense_LS2),Start(Y_Axis:Y_Move_To_Dispense_LS2))",
@@ -359,7 +394,7 @@
             EndTime: "37.200",
             Duration: "2.100",
         },
-        "38": {
+        "41": {
             ProcessName: "X_Axis",
             TaskName: "X_Move_To_Home_LS2",
             StartTimeFormula: "Max(End(Z1_Pipettor:Raise_After_Dispense_LS2), End(Z2_Pipettor:Raise_After_Dispense_LS2))",
@@ -368,7 +403,7 @@
             EndTime: "44.200",
             Duration: "2.000",
         },
-        "39": {
+        "42": {
             ProcessName: "Y_Axis",
             TaskName: "Y_Move_To_Home_LS2",
             StartTimeFormula: "Start(X_Axis:X_Move_To_Home_LS2)+0.1",
@@ -377,7 +412,7 @@
             EndTime: "44.300",
             Duration: "2.000",
         },
-        "40": {
+        "43": {
             ProcessName: "XY_Gantry",
             TaskName: "XY_Move_To_Home_LS2",
             StartTimeFormula: "Min(Start(X_Axis:X_Move_To_Home_LS2),Start(Y_Axis:Y_Move_To_Home_LS2))",
@@ -386,7 +421,7 @@
             EndTime: "44.300",
             Duration: "2.100",
         },
-        "41": {
+        "44": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Lower_To_Detect_LS2",
             StartTimeFormula: "End(XY_Gantry:XY_Move_To_Aspirate_LS2)",
@@ -395,7 +430,7 @@
             EndTime: "27.600",
             Duration: "1.500",
         },
-        "42": {
+        "45": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Aspirate_Descent_LS2",
             StartTimeFormula: "End($:Lower_To_Detect_LS2)",
@@ -404,7 +439,7 @@
             EndTime: "33.600",
             Duration: "6.000",
         },
-        "43": {
+        "46": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Raise_To_Home_LS2",
             StartTimeFormula: "Max(End($:Aspirate_Descent_LS2),End(Syringe_Z1:Aspirate_LS2))",
@@ -413,7 +448,7 @@
             EndTime: "35.100",
             Duration: "1.500",
         },
-        "44": {
+        "47": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Lower_To_Dispense_LS2",
             StartTimeFormula: "End(XY_Gantry:XY_Move_To_Dispense_LS2)",
@@ -422,7 +457,7 @@
             EndTime: "38.200",
             Duration: "1.000",
         },
-        "45": {
+        "48": {
             ProcessName: "Z1_Pipettor",
             TaskName: "Raise_After_Dispense_LS2",
             StartTimeFormula: "End(Syringe_Z1:Dispense_LS2)",
@@ -431,7 +466,7 @@
             EndTime: "42.200",
             Duration: "1.500",
         },
-        "46": {
+        "49": {
             ProcessName: "Syringe_Z1",
             TaskName: "Aspirate_LS2",
             StartTimeFormula: "End(Z1_Pipettor:Lower_To_Detect_LS2)",
@@ -440,7 +475,7 @@
             EndTime: "33.600",
             Duration: "6.000",
         },
-        "47": {
+        "50": {
             ProcessName: "Syringe_Z1",
             TaskName: "Dispense_LS2",
             StartTimeFormula: "End(Z1_Pipettor:Lower_To_Dispense_LS2)",
@@ -449,7 +484,7 @@
             EndTime: "40.700",
             Duration: "2.500",
         },
-        "48": {
+        "51": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Lower_To_Detect_LS2",
             StartTimeFormula: "End(XY_Gantry:XY_Move_To_Aspirate_LS2)",
@@ -458,7 +493,7 @@
             EndTime: "27.600",
             Duration: "1.500",
         },
-        "49": {
+        "52": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Aspirate_Descent_LS2",
             StartTimeFormula: "End($:Lower_To_Detect_LS2)",
@@ -467,7 +502,7 @@
             EndTime: "33.600",
             Duration: "6.000",
         },
-        "50": {
+        "53": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Raise_To_Home_LS2",
             StartTimeFormula: "Max(End($:Aspirate_Descent_LS2),End(Syringe_Z2:Aspirate_LS2))",
@@ -476,7 +511,7 @@
             EndTime: "35.100",
             Duration: "1.500",
         },
-        "51": {
+        "54": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Lower_To_Dispense_LS2",
             StartTimeFormula: "End(XY_Gantry:XY_Move_To_Dispense_LS2)",
@@ -485,7 +520,7 @@
             EndTime: "38.200",
             Duration: "1.000",
         },
-        "52": {
+        "55": {
             ProcessName: "Z2_Pipettor",
             TaskName: "Raise_After_Dispense_LS2",
             StartTimeFormula: "End(Syringe_Z2:Dispense_LS2)",
@@ -494,7 +529,7 @@
             EndTime: "42.200",
             Duration: "1.500",
         },
-        "53": {
+        "56": {
             ProcessName: "Syringe_Z2",
             TaskName: "Aspirate_LS2",
             StartTimeFormula: "End(Z2_Pipettor:Lower_To_Detect_LS2)",
@@ -503,7 +538,7 @@
             EndTime: "33.600",
             Duration: "6.000",
         },
-        "54": {
+        "57": {
             ProcessName: "Syringe_Z2",
             TaskName: "Dispense_LS2",
             StartTimeFormula: "End(Z2_Pipettor:Lower_To_Dispense_LS2)",
@@ -511,6 +546,60 @@
             EndTimeFormula: "Start($:$)+Duration(:_MAX_DISPENSE_TIME_)",
             EndTime: "40.700",
             Duration: "2.500",
+        },
+        "58": {
+            ProcessName: "",
+            TaskName: "PROCESS_PATH_ADVANCE_TIME",
+            StartTimeFormula: "0.0",
+            StartTime: "0.000",
+            EndTimeFormula: "1",
+            EndTime: "1.000",
+            Duration: "1.000",
+        },
+        "59": {
+            ProcessName: "Process_Path",
+            TaskName: "Advance_Track_LS1",
+            StartTimeFormula: "Start(:_LS1)+Duration(:_LOCKSTEP_)-Duration(:PROCESS_PATH_ADVANCE_TIME)-1",
+            StartTime: "22.000",
+            EndTimeFormula: "Start($:$)+Duration(:PROCESS_PATH_ADVANCE_TIME)",
+            EndTime: "23.000",
+            Duration: "1.000",
+        },
+        "60": {
+            ProcessName: "Process_Path",
+            TaskName: "Advance_Track_LS2",
+            StartTimeFormula: "Start($:Advance_Track_LS1)+Duration(:_LOCKSTEP_)",
+            StartTime: "46.000",
+            EndTimeFormula: "Start($:$)+Duration(:PROCESS_PATH_ADVANCE_TIME)",
+            EndTime: "47.000",
+            Duration: "1.000",
+        },
+        "61": {
+            ProcessName: "",
+            TaskName: "REAGENT1_DISPENSE_TIME",
+            StartTimeFormula: "0.0",
+            StartTime: "0.000",
+            EndTimeFormula: "1",
+            EndTime: "1.000",
+            Duration: "1.000",
+        },
+        "62": {
+            ProcessName: "Reagent1",
+            TaskName: "Dispense_LS1",
+            StartTimeFormula: "Max(End(Syringe_Z1:Dispense),End(Syringe_Z2:Dispense))",
+            StartTime: "16.700",
+            EndTimeFormula: "Start($:$)+Duration(:REAGENT1_DISPENSE_TIME)",
+            EndTime: "17.700",
+            Duration: "1.000",
+        },
+        "63": {
+            ProcessName: "Reagent1",
+            TaskName: "Dispense_LS2",
+            StartTimeFormula: "Max(End(Syringe_Z1:Dispense_LS2),End(Syringe_Z2:Dispense_LS2))",
+            StartTime: "40.700",
+            EndTimeFormula: "Start($:$)+Duration(:REAGENT1_DISPENSE_TIME)",
+            EndTime: "41.700",
+            Duration: "1.000",
         },
     },
 }

@@ -65,13 +65,35 @@ def show_splash():
 # Setup program name and version information
 PROGRAM_FILENAME = os.path.splitext(os.path.basename(sys.argv[0]))[0]
 capitalize_first_four = lambda s: s[:4].upper() + s[4:]     # Capitalize first 4 letters
-from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID
+from ptt_appinfo import APP_VERSION, APP_COPYRIGHT, APP_AUTHOR, APP_COMPANY, APP_DATE, APP_DESCRIPTION, APP_PACKAGE, APP_ID, APP_REPO_URL
+from ptt_utils import html_to_plain_text, build_issue_url, get_os_info
 PROGRAM_NAME    = capitalize_first_four(PROGRAM_FILENAME)
 PACKAGE_NAME    = APP_PACKAGE
 
 from platformdirs import user_config_dir, user_log_dir
 USER_LOG_PATH = user_log_dir(PACKAGE_NAME, APP_COMPANY)
 from ptt_debugging import CrashLogger
+from ptt_config import load_view_config, get_user_ini_path
+from ptt_recent_files import RecentFiles
+
+DEFAULT_CONFIG = """\
+[META]
+; DO NOT EDIT THIS SECTION! [META] is maintained by the program
+app_package=PTTimeline
+app_name=PTTView
+app_version=0.0.0
+ini_version=1
+
+[DEBUGGING]
+enabled_bool=False
+filename=pttview.dbg
+"""
+
+RECENT_FILES_MAX = 15
+
+# Runtime objects — populated in __main__
+config: dict = {}
+recent_files: 'RecentFiles | None' = None
 
 window_icon_path = os.path.join(_RES_DIR, f"{PACKAGE_NAME}.ico")
 program_icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
@@ -665,6 +687,9 @@ class ImageViewer(QMainWindow):
         open_action.triggered.connect(self.open_file_dialog)
         file_menu.addAction(open_action)
 
+        self.file_open_recent_menu = file_menu.addMenu("Open &Recent")
+        self.file_open_recent_menu.aboutToShow.connect(self._rebuild_recent_menu)
+
         file_menu.addSeparator()
 
         exit_action = QAction("E&xit", self)
@@ -693,6 +718,28 @@ class ImageViewer(QMainWindow):
         system_info_action = QAction("&System Information", self)
         system_info_action.triggered.connect(self.show_system_info)
         help_menu.addAction(system_info_action)
+
+        help_menu.addSeparator()
+
+        support_menu = help_menu.addMenu("S&upport")
+
+        support_discussions_action = QAction("&Discussions", self)
+        support_discussions_action.triggered.connect(self.open_discussions)
+        support_menu.addAction(support_discussions_action)
+
+        support_issues_action = QAction("&Issues", self)
+        support_issues_action.triggered.connect(self.open_issues)
+        support_menu.addAction(support_issues_action)
+
+        support_menu.addSeparator()
+
+        support_bug_action = QAction("Submit &Bug Report", self)
+        support_bug_action.triggered.connect(self.submit_bug_report)
+        support_menu.addAction(support_bug_action)
+
+        support_feature_action = QAction("Submit &Feature Request", self)
+        support_feature_action.triggered.connect(self.submit_feature_request)
+        support_menu.addAction(support_feature_action)
 
         
     def create_toolbar(self):
@@ -784,6 +831,10 @@ class ImageViewer(QMainWindow):
             
             self.status_bar.showMessage(f"Loaded: {os.path.basename(self.image_file)} | Press F1 for help")
             self.update_zoom_label()
+
+            # Update recent files list
+            if recent_files is not None:
+                recent_files.add(self.image_file)
             
         except Exception as e:
             QMessageBox.critical(self, "Error Loading Image", 
@@ -906,6 +957,23 @@ class ImageViewer(QMainWindow):
             navigator = NavigatorDialog(self.image_widget, self.scroll_area, self)
             navigator.exec()
             
+    def _rebuild_recent_menu(self):
+        """Repopulate the Open Recent submenu just before it is shown."""
+        if recent_files is None:
+            return
+        self.file_open_recent_menu.clear()
+        new_menu = recent_files.build_menu(self, self._open_recent_file)
+        for action in new_menu.actions():
+            self.file_open_recent_menu.addAction(action)
+
+    def _open_recent_file(self, file_path: str):
+        """Open a file chosen from the Open Recent submenu."""
+        if not os.path.isfile(file_path):
+            QMessageBox.warning(self, 'File Not Found',
+                f'The file no longer exists:\n{file_path}')
+            return
+        self.load_new_image(file_path)
+
     def open_file_dialog(self):
         """Show file dialog to open a new image file"""
         # Create file filter for supported formats
@@ -923,7 +991,7 @@ class ImageViewer(QMainWindow):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open Image File",
-            "",
+            recent_files.get_dialog_dir() if recent_files else "",
             file_filter
         )
         
@@ -966,6 +1034,10 @@ class ImageViewer(QMainWindow):
             # Update status
             self.status_bar.showMessage(f"Loaded: {os.path.basename(file_path)} | Press F1 for help")
             self.update_zoom_label()
+
+            # Update recent files list
+            if recent_files is not None:
+                recent_files.add(file_path)
             
         except Exception as e:
             QMessageBox.critical(self, "Error Loading Image", 
@@ -1000,20 +1072,7 @@ class ImageViewer(QMainWindow):
     def show_about(self):
         """Display About dialog with version and copyright information"""
         # debugging.enter()
-        
-        # Create a custom message box instead of using QMessageBox.about()
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(f"About {PROGRAM_NAME}")
-        
-        # Load and set the icon (adjust path as needed)
-        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
-        if os.path.isfile(icon_path):
-            icon = QIcon(icon_path)
-            msg_box.setIconPixmap(icon.pixmap(48, 48))  # pixel display size
-        else:
-            # Fallback to default info icon if file not found
-            msg_box.setIcon(QMessageBox.Information)
-        
+
         about_text = f"""
             <h2>{PROGRAM_NAME}</h2>
             <p><b>Version:</b> {APP_VERSION}</p>
@@ -1023,10 +1082,54 @@ class ImageViewer(QMainWindow):
             <p><b>Date:</b> {APP_DATE}</p>
             <p>{APP_COPYRIGHT}</p>
             """
-        msg_box.setText(about_text)
-        msg_box.setTextFormat(Qt.RichText)
-        msg_box.exec()
-         # debugging.leave()
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"About {PROGRAM_NAME}")
+
+        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
+        icon_exists = os.path.isfile(icon_path)
+        if icon_exists:
+            icon = QIcon(icon_path)
+            dlg.setWindowIcon(icon)
+
+        icon_label = QLabel()
+        if icon_exists:
+            icon_label.setPixmap(icon.pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignTop)
+
+        content = QLabel()
+        content.setTextFormat(Qt.RichText)
+        content.setText(about_text)
+        content.setWordWrap(True)
+        content.setOpenExternalLinks(True)
+
+        body_layout = QHBoxLayout()
+        body_layout.addWidget(icon_label)
+        body_layout.addWidget(content)
+
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        close_btn.setDefault(True)
+
+        def copy_to_clipboard():
+            QApplication.clipboard().setText(html_to_plain_text(about_text))
+            copy_btn.setText("Copied")
+            QTimer.singleShot(1500, lambda: copy_btn.setText("Copy to Clipboard"))
+
+        copy_btn.clicked.connect(copy_to_clipboard)
+        close_btn.clicked.connect(dlg.accept)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout = QVBoxLayout(dlg)
+        layout.addLayout(body_layout)
+        layout.addLayout(btn_layout)
+
+        dlg.exec()
+        # debugging.leave()
 
     def show_system_info_OLD(self):
         """Display System Information dialog with Python and module versions."""
@@ -1070,9 +1173,8 @@ class ImageViewer(QMainWindow):
         msg_box.setText(system_text.strip())
         msg_box.exec()
 
-    def show_system_info(self):
-        """Display System Information dialog with Python and module versions"""
-
+    def _build_sysinfo_html(self) -> str:
+        """Build and return the System Information HTML string."""
         # Get Python version
         python_version, python_details = sys.version.split(' ', 1)
         python_build, python_compile = python_details.split(') [', 1)
@@ -1089,33 +1191,14 @@ class ImageViewer(QMainWindow):
             except Exception:
                 module_versions.append(f"<tr><td>&nbsp;&nbsp;{module_name}</td><td>&nbsp;<i>(version not found)</i></td></tr>")
 
-        # Get OS information with Windows 11 detection
+        os_info      = get_os_info()
         platform_str = platform.platform()
-        os_name = platform.system()
-        os_release = platform.release()
+        current_dir  = os.getcwd()
+        script_path  = os.path.dirname(os.path.abspath(__file__))
+        config_path  = user_config_dir(APP_PACKAGE, APP_COMPANY, roaming=True)
+        log_path     = user_log_dir(APP_PACKAGE, APP_COMPANY)
 
-        # Check if Windows 11 based on build number
-        if os_name == "Windows" and os_release == "10":
-            # Format: Windows-10-10.0.BUILDNUMBER-SP0
-            build_match = re.search(r'10\.0\.(\d+)', platform_str)
-            if build_match:
-                build_num = int(build_match.group(1))
-                if build_num >= 22000:  # Windows 11 starts at build 22000
-                    os_info = f"Windows 11 (Build {build_num})"
-                else:
-                    os_info = f"Windows 10 (Build {build_num})"
-            else:
-                os_info = f"{os_name} {os_release}"
-        else:
-            os_info = f"{os_name} {os_release}"
-
-        # Get file paths
-        current_dir = os.getcwd()
-        script_path = os.path.dirname(os.path.abspath(__file__))
-        config_path = user_config_dir(APP_PACKAGE, APP_COMPANY, roaming=True)
-        log_path    = user_log_dir(APP_PACKAGE, APP_COMPANY)
-
-        sysinfo_text = f"""
+        return f"""
             <h3>System Information</h3>
             <p><b>Application:</b> {PROGRAM_NAME} v{APP_VERSION}</p>
 
@@ -1123,8 +1206,7 @@ class ImageViewer(QMainWindow):
             <p><b>Platform:</b> {platform_str}</p>
 
             <p><b>Python Version:</b> {python_version}<br>&nbsp;&nbsp;{python_build}<br>&nbsp;&nbsp;{python_compile}</p>
-            <p><b>Third-Party Packages:</b></p
-            >
+            <p><b>Third-Party Packages:</b></p>
             <table border="0" cellpadding="0">
             {''.join(module_versions)}
             </table>
@@ -1137,7 +1219,94 @@ class ImageViewer(QMainWindow):
             <tr><td><b>Log Directory:</b></td><td>{log_path}</td></tr>
             </table>
             """
-        QMessageBox.about(self, "System Information", sysinfo_text)
+
+    def show_system_info(self):
+        """Display System Information dialog with Python and module versions"""
+
+        sysinfo_text = self._build_sysinfo_html()
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("System Information")
+
+        icon_path = os.path.join(_RES_DIR, f"{PROGRAM_NAME}.ico")
+        icon_exists = os.path.isfile(icon_path)
+        if icon_exists:
+            icon = QIcon(icon_path)
+            dlg.setWindowIcon(icon)
+
+        icon_label = QLabel()
+        if icon_exists:
+            icon_label.setPixmap(icon.pixmap(48, 48))
+        icon_label.setAlignment(Qt.AlignTop)
+
+        content = QLabel()
+        content.setTextFormat(Qt.RichText)
+        content.setText(sysinfo_text)
+        content.setWordWrap(True)
+
+        body_layout = QHBoxLayout()
+        body_layout.addWidget(icon_label)
+        body_layout.addWidget(content)
+
+        copy_btn  = QPushButton("Copy to Clipboard")
+        close_btn = QPushButton("Close")
+        close_btn.setDefault(True)
+
+        def copy_to_clipboard():
+            QApplication.clipboard().setText(html_to_plain_text(sysinfo_text))
+            copy_btn.setText("Copied")
+            QTimer.singleShot(1500, lambda: copy_btn.setText("Copy to Clipboard"))
+
+        copy_btn.clicked.connect(copy_to_clipboard)
+        close_btn.clicked.connect(dlg.accept)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(copy_btn)
+        btn_layout.addWidget(close_btn)
+
+        layout = QVBoxLayout(dlg)
+        layout.addLayout(body_layout)
+        layout.addLayout(btn_layout)
+
+        dlg.exec()
+
+    def open_discussions(self):
+        """Open the PTTimeline GitHub Discussions page in the default browser."""
+        webbrowser.open_new_tab(f"{APP_REPO_URL}/discussions")
+
+    def open_issues(self):
+        """Open the PTTimeline GitHub Issues page in the default browser."""
+        webbrowser.open_new_tab(f"{APP_REPO_URL}/issues")
+
+    def submit_bug_report(self):
+        """Open a pre-filled GitHub bug report issue form in the default browser."""
+        try:
+            context = {
+                "Which Application(s)?": PROGRAM_NAME,
+                "Version":               f"v{APP_VERSION}",
+                "Operating System":      get_os_info(),
+                "System Information":    html_to_plain_text(self._build_sysinfo_html()),
+            }
+            url = build_issue_url(APP_REPO_URL, "bug_report.md", context)
+            webbrowser.open_new_tab(url)
+        except Exception as e:
+            QMessageBox.warning(self, "Network Error",
+                f"Could not reach GitHub to open the bug report form.\n\nPlease check your internet connection and try again.\n\nDetails: {e}")
+
+    def submit_feature_request(self):
+        """Open a pre-filled GitHub feature request issue form in the default browser."""
+        try:
+            context = {
+                "Which application(s)?": PROGRAM_NAME,
+                "Version":               f"v{APP_VERSION}",
+                "Operating System":      get_os_info(),
+            }
+            url = build_issue_url(APP_REPO_URL, "feature_request.md", context)
+            webbrowser.open_new_tab(url)
+        except Exception as e:
+            QMessageBox.warning(self, "Network Error",
+                f"Could not reach GitHub to open the feature request form.\n\nPlease check your internet connection and try again.\n\nDetails: {e}")
 
         
     def show_user_guide(self):
@@ -1293,5 +1462,13 @@ if __name__ == "__main__":
 
     # Parse and validate command line arguments FIRST - before any other initialization
     filename = parse_command_line_args()
-    
+
+    # Load User Config/INI file and initialize recent files manager
+    config = load_view_config(f'{PROGRAM_FILENAME}.ini', DEFAULT_CONFIG, PROGRAM_NAME)
+    recent_files = RecentFiles(
+        get_user_ini_path(f'{PROGRAM_FILENAME}.ini'),
+        section='RECENT_FILES',
+        max_entries=RECENT_FILES_MAX,
+    )
+
     main(filename, splash=_splash, splash_label=_splash_label, splash_img=_splash_img)

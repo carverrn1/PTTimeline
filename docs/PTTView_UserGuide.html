@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PTTView User Guide &mdash; PTTimeline v0.4.0-dev</title>
+<title>PTTView User Guide &mdash; PTTimeline v0.5.0-dev</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -318,7 +318,7 @@
 
   <!-- PAGE HEADER -->
   <header class="page-header">
-    <div class="app-label">PTTimeline v0.4.0-dev</div>
+    <div class="app-label">PTTimeline v0.5.0-dev</div>
     <h1>PTTView User Guide</h1>
     <div class="subtitle">Timeline Image Viewer &mdash; Smooth zoom, pan, and thumbnail navigation for exported timeline plots</div>
     <div class="data-flow">
@@ -543,6 +543,11 @@ python pttview.py</code></pre>
             <td><strong>Open</strong></td>
             <td><kbd>Ctrl</kbd>+<kbd>O</kbd></td>
             <td>Opens a file dialog filtered to all supported image formats. Select any supported file to load it into the viewer. If a file is already open, it is replaced by the new selection.</td>
+          </tr>
+          <tr>
+            <td><strong>Open Recent</strong></td>
+            <td>&mdash;</td>
+            <td>Opens a submenu listing the most recently opened image files (up to 15 entries, newest first). Entries 1–9 have keyboard accelerators. Hovering over an entry shows the full path in a tooltip. Stale entries (files no longer on disk) are silently pruned when the submenu opens. A <strong>Clear Recent Files</strong> item at the bottom clears the entire list. The file dialog for Open defaults to the directory of the most recent entry.</td>
           </tr>
           <tr>
             <td><strong>Exit</strong></td>
@@ -874,7 +879,7 @@ python pttview.py</code></pre>
 
   <!-- FOOTER -->
   <footer>
-    <strong>PTTimeline v0.4.0-dev</strong> &mdash; PTTView User Guide
+    <strong>PTTimeline v0.5.0-dev</strong> &mdash; PTTView User Guide
   </footer>
 
 </div>

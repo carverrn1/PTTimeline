@@ -3,11 +3,11 @@
 ; Applications: PTTEdit, PTTPlot, PTTView
 ; Publisher:    RNCSoftware
 ; Author:       Richard Carver
-; Version:      0.4.0.1-dev
+; Version:      0.5.0.0-dev
 
 #define AppName        "PTTimeline"
-#define AppVersion     "0.4.0.1-dev"
-#define AppVerName     "PTTimeline 0.4.0.1-dev"
+#define AppVersion     "0.5.0.0-dev"
+#define AppVerName     "PTTimeline 0.5.0.0-dev"
 #define AppPublisher   "RNCSoftware"
 #define AppAuthor      "Richard Carver"
 #define AppCopyright   "Copyright (C) 2026 Richard Carver"
@@ -30,7 +30,7 @@ DefaultDirName           ={commonpf}\{#AppPublisher}\{#AppName}
 DefaultGroupName         ={#AppName}
 DisableProgramGroupPage  =no
 OutputDir                =installer
-OutputBaseFilename       =PTTimeline-0.4.0.1-dev-setup
+OutputBaseFilename       =PTTimeline_0.5.0.0-dev_setup
 SetupIconFile            ={#ResourcesDir}\PTTimeline.ico
 LicenseFile              =license.txt
 Compression              =lzma2/ultra64
@@ -106,30 +106,72 @@ Name: "{group}\Sample Files";         Filename: "{commondocs}\RNCSoftware\PTTime
 Name: "{group}\Uninstall PTTimeline"; Filename: "{uninstallexe}";   IconFilename: "{app}\resources\PTTimeline.ico"
 
 ; Desktop shortcuts — optional, installed directly on desktop (user choice during install)
-Name: "{commondesktop}\PTTEdit";  Filename: "{app}\pttedit.exe"; IconFilename: "{app}\resources\pttedit.ico"; Comment: "Process-Task Timeline Editor";  Tasks: desktopicons
-Name: "{commondesktop}\PTTPlot";  Filename: "{app}\pttplot.exe"; IconFilename: "{app}\resources\pttplot.ico"; Comment: "Process-Task Timeline Plotter"; Tasks: desktopicons
-Name: "{commondesktop}\PTTView";  Filename: "{app}\pttview.exe"; IconFilename: "{app}\resources\pttview.ico"; Comment: "Process-Task Timeline Viewer";  Tasks: desktopicons
+Name: "{commondesktop}\PTTEdit";  Filename: "{app}\pttedit.exe"; IconFilename: "{app}\resources\pttedit.ico"; Comment: "Process-Task Timeline v{#AppVersion} Editor";  Tasks: desktopicons
+Name: "{commondesktop}\PTTPlot";  Filename: "{app}\pttplot.exe"; IconFilename: "{app}\resources\pttplot.ico"; Comment: "Process-Task Timeline v{#AppVersion} Plotter"; Tasks: desktopicons
+Name: "{commondesktop}\PTTView";  Filename: "{app}\pttview.exe"; IconFilename: "{app}\resources\pttview.ico"; Comment: "Process-Task Timeline v{#AppVersion} Viewer";  Tasks: desktopicons
+; -----------------------------------------------------------------------------
+; Temporary desktop shortcut for uninstaller during development only
+; TODO: Remove this entry before v1.0 release (end users use Start Menu or Settings > Apps)
+; -----------------------------------------------------------------------------
+Name: "{commondesktop}\PTTimeline v{#AppVersion} Uninstall"; Filename: "{uninstallexe}"; IconFilename: "{app}\resources\PTTimeline.ico"; Comment: "Process-Task Timeline v{#AppVersion} Uninstall";  Tasks: desktopicons
 
 ; -----------------------------------------------------------------------------
 ; FILE ASSOCIATIONS
 ; -----------------------------------------------------------------------------
 
 [Registry]
-; .pttd -> PTTEdit
+; ---------------------------------------------------------------------------
+; .pttd ProgId -> PTTEdit (default open)
+; ---------------------------------------------------------------------------
 Root: HKCR; Subkey: ".pttd";                              ValueType: string; ValueName: ""; ValueData: "PTTimeline.pttd";      Flags: uninsdeletevalue
+Root: HKCR; Subkey: ".pttd";                              ValueType: string; ValueName: "PerceivedType"; ValueData: "document"
 Root: HKCR; Subkey: "PTTimeline.pttd";                    ValueType: string; ValueName: ""; ValueData: "PTTimeline Data File"; Flags: uninsdeletekey
 Root: HKCR; Subkey: "PTTimeline.pttd\DefaultIcon";        ValueType: string; ValueName: ""; ValueData: "{app}\resources\pttedit.ico,0"
 Root: HKCR; Subkey: "PTTimeline.pttd\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\pttedit.exe"" ""%1"""
 
-; .pttp -> PTTPlot
+; ---------------------------------------------------------------------------
+; PTTPlot — App Paths (tells Windows where pttplot.exe lives)
+; ---------------------------------------------------------------------------
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\pttplot.exe"; ValueType: string; ValueName: "";     ValueData: "{app}\pttplot.exe"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\pttplot.exe"; ValueType: string; ValueName: "Path"; ValueData: "{app}"
+
+; ---------------------------------------------------------------------------
+; PTTPlot — Application registration + Capabilities (enables "Open with" flyout)
+; ---------------------------------------------------------------------------
+Root: HKLM; Subkey: "SOFTWARE\RNCSoftware\PTTimeline\PTTPlot\Capabilities"; ValueType: string; ValueName: "ApplicationName";        ValueData: "PTTPlot";                          Flags: uninsdeletekey
+Root: HKLM; Subkey: "SOFTWARE\RNCSoftware\PTTimeline\PTTPlot\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "Process-Task Timeline Plotter"
+Root: HKLM; Subkey: "SOFTWARE\RNCSoftware\PTTimeline\PTTPlot\Capabilities\FileAssociations"; ValueType: string; ValueName: ".pttd"; ValueData: "PTTimeline.pttd"
+
+; RegisteredApplications — points Windows to the Capabilities block
+Root: HKLM; Subkey: "SOFTWARE\RegisteredApplications"; ValueType: string; ValueName: "PTTPlot"; ValueData: "SOFTWARE\RNCSoftware\PTTimeline\PTTPlot\Capabilities"; Flags: uninsdeletevalue
+
+; ---------------------------------------------------------------------------
+; PTTEdit — HKCR\Applications entry (FriendlyAppName for "Open with" display)
+; ---------------------------------------------------------------------------
+Root: HKCR; Subkey: "Applications\pttedit.exe"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "PTTEdit"; Flags: uninsdeletekey
+
+; ---------------------------------------------------------------------------
+; PTTPlot — HKCR\Applications entry (verb + supported types for "Open with")
+; ---------------------------------------------------------------------------
+Root: HKCR; Subkey: "Applications\pttplot.exe";                        ValueType: string; ValueName: "FriendlyAppName"; ValueData: "PTTPlot";               Flags: uninsdeletekey
+Root: HKCR; Subkey: "Applications\pttplot.exe\DefaultIcon";            ValueType: string; ValueName: ""; ValueData: "{app}\resources\pttplot.ico,0"
+Root: HKCR; Subkey: "Applications\pttplot.exe\SupportedTypes";         ValueType: string; ValueName: ".pttd"; ValueData: ""
+Root: HKCR; Subkey: "Applications\pttplot.exe\shell\open";             ValueType: string; ValueName: "FriendlyDocName"; ValueData: "PTTimeline Data File"
+Root: HKCR; Subkey: "Applications\pttplot.exe\shell\open\command";     ValueType: string; ValueName: ""; ValueData: """{app}\pttplot.exe"" ""%1"""
+
+; ---------------------------------------------------------------------------
+; Link .pttd -> pttplot.exe so it appears in the modern "Open with" flyout
+; ---------------------------------------------------------------------------
+Root: HKCR; Subkey: ".pttd\OpenWithList\pttplot.exe"; Flags: uninsdeletekey
+
+; ---------------------------------------------------------------------------
+; .pttp ProgId -> PTTPlot (default open)
+; ---------------------------------------------------------------------------
 Root: HKCR; Subkey: ".pttp";                              ValueType: string; ValueName: ""; ValueData: "PTTimeline.pttp";       Flags: uninsdeletevalue
-Root: HKCR; Subkey: "PTTimeline.pttp";                    ValueType: string; ValueName: ""; ValueData: "PTTimeline Plot File"; Flags: uninsdeletekey
+Root: HKCR; Subkey: ".pttp";                              ValueType: string; ValueName: "PerceivedType"; ValueData: "document"
+Root: HKCR; Subkey: "PTTimeline.pttp";                    ValueType: string; ValueName: ""; ValueData: "PTTimeline Plot File";  Flags: uninsdeletekey
 Root: HKCR; Subkey: "PTTimeline.pttp\DefaultIcon";        ValueType: string; ValueName: ""; ValueData: "{app}\resources\pttplot.ico,0"
 Root: HKCR; Subkey: "PTTimeline.pttp\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\pttplot.exe"" ""%1"""
-
-; Notify Windows shell of file association changes
-Root: HKCR; Subkey: ".pttd"; ValueType: string; ValueName: "PerceivedType"; ValueData: "document"
-Root: HKCR; Subkey: ".pttp"; ValueType: string; ValueName: "PerceivedType"; ValueData: "document"
 
 ; -----------------------------------------------------------------------------
 ; CODE — prompt user if sample files already exist on reinstall/upgrade
@@ -196,9 +238,10 @@ end;
 // ---------------------------------------------------------------------------
 
 [Run]
-; Refresh shell so file associations take effect immediately
+; Refresh shell so file associations and app registration take effect immediately
 Filename: "{cmd}"; Parameters: "/c assoc .pttd=PTTimeline.pttd"; Flags: runhidden
 Filename: "{cmd}"; Parameters: "/c assoc .pttp=PTTimeline.pttp"; Flags: runhidden
+Filename: "{cmd}"; Parameters: "/c ie4uinit.exe -show"; Flags: runhidden
 
 ; Optional: offer to launch PTTEdit after install
 Filename: "{app}\pttedit.exe"; Description: "Launch PTTEdit now"; Flags: nowait postinstall skipifsilent unchecked

@@ -583,3 +583,45 @@ def load_plot_config(app_ini_filename, defaults_str, app_name):
     user_ini_cfg  = _load_user_ini(user_ini_path)
     _apply_ini_config(user_ini_cfg, config)
     return config
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared utility
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_user_ini_path(app_ini_filename: str) -> str:
+    """Return the full path to an app's user INI file in the roaming config dir.
+
+    Used by callers that need the INI path independently of config loading
+    (e.g. to pass to RecentFiles after the config dict has already been built).
+    The directory is created if it does not exist.
+    """
+    cfg_dir = user_config_dir(APP_PACKAGE, APP_COMPANY, roaming=True)
+    os.makedirs(cfg_dir, exist_ok=True)
+    return os.path.join(cfg_dir, app_ini_filename)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PTTView config loader
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_view_config(app_ini_filename, defaults_str, app_name):
+    """
+    Provision user config dir and INI file for PTTView, then return a
+    populated config dict with suffix-based type conversion.
+
+    PTTView uses the same simple pattern as PTTEdit: defaults merged with
+    user overrides, no marker or annotation logic needed.
+    """
+    user_ini_path = _provision_user_ini(app_ini_filename, defaults_str, app_name)
+    defaults_cfg  = _parse_defaults(defaults_str)
+    user_cfg      = _load_user_ini(user_ini_path)
+
+    result = {}
+    for section in defaults_cfg.sections():
+        result[section] = {}
+        for key, default_raw in defaults_cfg.items(section):
+            raw = user_cfg.get(section, key, fallback=default_raw)
+            result[section][key] = _convert_value(key, raw)
+
+    return result
