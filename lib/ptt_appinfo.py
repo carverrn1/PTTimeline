@@ -15,7 +15,7 @@ consistent version and metadata across the application suite.
 #
 
 
-APP_VERSION_INFO = (0, 5, 0, "dev")
+APP_VERSION_INFO = (0, 6, 0, "dev", 0)
 
 
 # APP_VERSION_INFO = (1, 0, 0)              # Stable release
