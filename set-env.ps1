@@ -44,4 +44,8 @@
 
 .\.venv\Scripts\activate
 $global:folderName = Split-Path -Leaf (Get-Location)
-function global:prompt { "(.venv) $global:folderName> " }
+function global:prompt {
+    $branch = git branch --show-current 2>$null
+    if ($branch) { "(.venv) $global:folderName [$branch]> " }
+    else         { "(.venv) $global:folderName> " }
+}
