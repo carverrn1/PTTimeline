@@ -28,6 +28,8 @@ copy /y PTTimeline_Issues.md "%target_folder%"
 copy /y *.bat "%target_folder%"
 copy /y *.ps1 "%target_folder%"
 copy /y _*.py "%target_folder%"
+copy /y pyproject.toml "%target_folder%"
+copy /y uv.lock "%target_folder%"
 
 :: Support Files
 copy /y *.md "%target_folder%"
