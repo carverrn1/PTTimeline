@@ -1,0 +1,25 @@
+[project]
+name = "PTTimeline"
+description = "Process-Task Timeline suite for real-time systems engineers"
+requires-python = ">=3.11"
+version = "0.6.0"
+authors = [{ name = "Richard Carver", email = "" }]
+
+dependencies = [
+    "ConfigUpdater>=3.2",
+    "json5>=0.13.0",
+    "matplotlib>=3.10",
+    "numpy>=2.0",
+    "odfpy>=1.4",
+    "pandas>=2.2",
+    "Pillow>=11.0",
+    "platformdirs>=4.9",
+    "PyMuPDF>=1.27",
+    "PySide6>=6.8",
+    "pywin32>=306; sys_platform == 'win32'",
+]
+
+[dependency-groups]
+build = [
+    "pyinstaller>=6.19",
+]

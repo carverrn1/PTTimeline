@@ -71,10 +71,15 @@ These demonstrate PTTimeline with representative real-world timing diagrams and 
 ### Requirements
 
 - Python 3.11+
-- PySide6, matplotlib, pandas, Pillow, json5, platformdirs, configupdater, odfpy, PyMuPDF
+- [uv](https://docs.astral.sh/uv/) for environment and dependency management
+
+### Setup
 
 ```
-pip install PySide6 matplotlib pandas Pillow json5 platformdirs configupdater odfpy PyMuPDF
+pyenv local 3.11.9         # Set Python version for this folder
+uv venv                    # Create the virtual environment
+uv sync --group build      # Install all dependencies
+. .\set-env.ps1            # Activate the virtual environment
 ```
 
 ### Running from Source
@@ -93,7 +98,7 @@ build_exe.bat          # Build executables only (PyInstaller)
 build_install.bat      # Build installer only (Inno Setup, run manually)
 ```
 
-Requires [PyInstaller](https://pyinstaller.org) and [Inno Setup](https://jrsoftware.org/isinfo.php) to be installed.
+Requires [Inno Setup](https://jrsoftware.org/isinfo.php) to be installed. PyInstaller is managed via `uv` as a build dependency.
 
 ---
 

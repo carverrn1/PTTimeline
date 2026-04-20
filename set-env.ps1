@@ -8,10 +8,17 @@
 #   environment for a new project:
 #
 #     pyenv local x.x.x              # Set the Python version for this folder
-#     python -m venv .venv           # Create the virtual environment
+#     uv venv                        # Create the virtual environment
+#     uv sync --group build          # Install all dependencies from pyproject.toml
 #     . .\set-env.ps1                # Activate (first time, before alias is set)
-#     pip install <packages>         # Install project dependencies
-#     pip freeze > requirements.txt  # Save dependency list
+#
+#   To add a new dependency:
+#
+#     uv add <package>               # Adds to pyproject.toml and updates uv.lock
+#
+#   To add a build-only dependency:
+#
+#     uv add --group build <package>
 #
 # USAGE:
 #   If this file was downloaded (e.g. from a browser or Claude), unblock it
