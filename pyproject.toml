@@ -1,7 +1,7 @@
 [project]
 name = "PTTimeline"
 description = "Process-Task Timeline suite for real-time systems engineers"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 version = "0.6.0"
 authors = [{ name = "Richard Carver", email = "" }]
 

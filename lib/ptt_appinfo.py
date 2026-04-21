@@ -15,7 +15,7 @@ consistent version and metadata across the application suite.
 #
 
 
-APP_VERSION_INFO = (0, 6, 0, "dev", 0)
+APP_VERSION_INFO = (0, 6, 0, "dev", 1)
 
 
 # APP_VERSION_INFO = (1, 0, 0)              # Stable release
@@ -43,7 +43,7 @@ APP_PACKAGE     = "PTTimeline"
 APP_DESCRIPTION = "Process-Task Timeline Editor (PTTEdit),<br>Process-Task Timeline Plotter (PTTPlot) and Process-Task Timeline Viewer (PTTView)"
 APP_AUTHOR      = "Richard Carver"
 APP_COMPANY     = "RNCSoftware"
-APP_DATE        = "2026-04-04"
+APP_DATE        = "2026-04-21"
 APP_COPYRIGHT   = f"© 2026 by {APP_AUTHOR}"
 
 APP_ID       = "com.RNCSoftware.PTTimeline".lower()   # DON'T CHANGE! Used to locate user specific application data (e.g. %APP_DATA%)
